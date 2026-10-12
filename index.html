@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#17140f"><meta name="description" content="Dwarf Forge：开源第一人称暗黑锻造游戏。加热剑刃，赌下一锤，收集遗物，缴纳龙税。"><title>Dwarf Forge · 矮人工坊</title></head>
+<body>
+ <div id="world" aria-label="3D 铁匠铺"></div>
+ <div class="vignette" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div>
+ <div id="boot"><div class="loader-sigil">✧</div><span>正在点燃炉火</span><small>THE FORGE AWAKENS</small></div>
+ <main id="interface">
+  <section id="title-screen" class="title-screen hidden">
+   <p class="eyebrow">A DARK FORGING ROGUELITE · WEB EDITION</p>
+   <h1>DWARF<span>FORGE</span></h1><div class="title-rule"></div>
+   <p class="title-quote">下一锤，可能是财富。<br>也可能是灰烬。</p>
+   <div class="title-buttons"><button id="start" class="primary">开始合约 <span>→</span></button><button id="continue" class="secondary hidden">继续锻造</button><button id="save-picker" class="secondary">存档</button></div>
+   <div class="title-bottom"><a class="project-link" href="https://github.com/AtarisMio/dwarf-forge" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看 Dwarf Forge 源码（新标签页）"><span aria-hidden="true">&lt;/&gt;</span><span>GitHub · 源码 / Star</span><span class="project-link-arrow" aria-hidden="true">↗</span></a><small>开源矮人工坊 · 基于 ForgeTax 公开玩法的独立实现</small></div>
+  </section>
+  <div id="hud" class="hidden">
+   <div class="objective"><div class="day-row"><span class="seal">✧</span><span>合约第 <b id="day">01</b> 日</span><small id="contract-length">/ 21</small></div><div id="calendar-date" class="calendar-date">4月15日</div><div class="tax-row"><small>今日龙税</small><strong><span id="due">1,800</span><em>G</em></strong></div><div class="tribute-progress"><i id="tribute-fill"></i></div><div class="tax-bottom"><span>已献 <b id="offered">0</b> G</span><span id="anger" aria-label="龙的愤怒"></span></div></div>
+   <div class="tools"><button id="sound" aria-label="关闭声音" title="声音">♫</button><button id="help" aria-label="操作说明" title="操作说明">?</button><button id="pause" aria-label="暂停" title="暂停">Ⅱ</button></div>
+   <div id="reticle" aria-hidden="true"><i></i><i></i></div>
+   <div id="toast" role="status" aria-live="polite"></div>
+   <div id="outcome" aria-live="polite"></div>
+   <div id="target-prompt" class="target-prompt"><kbd>E</kbd><span>铁砧</span></div>
+   <div class="wallet"><div class="currency"><span>◈</span><strong id="gold">0</strong><small>G</small></div><div class="currency sword-currency"><span aria-hidden="true">⚔</span><strong id="sword-coins">0</strong><small>剑币</small></div></div>
+   <div class="bottom-tools"><button id="bag"><span>⚔</span> 剑 <b id="sword-count">3</b><kbd>Tab</kbd></button><button id="relic-bag"><span>⟐</span> 遗物 <b id="relic-count">0/8</b></button><button id="codex">图鉴</button></div>
+   <div id="held-label" class="held-label hidden"></div>
+   <div class="touch-only touch-controls">
+    <div id="touch-move-pad" class="touch-move-pad" role="group" aria-label="移动摇杆"><span class="touch-move-ring" aria-hidden="true"></span><span id="touch-move-knob" class="touch-move-knob" aria-hidden="true">✧</span><small aria-hidden="true">移动</small></div>
+    <div id="touch-actions" class="touch-actions"><button id="touch-interact" class="primary">交互</button><button id="touch-secondary">放下剑</button></div>
+    <button id="touch-travel" class="touch-travel">设施 <span aria-hidden="true">◇</span></button>
+   </div>
+   <div id="roam-hint" class="roam-hint">WASD 移动 <i>·</i> <span id="look-mode">按住左键拖动观察</span> <i>·</i> 点击设施 / E 交互</div>
+   <nav id="stations" class="hidden" aria-label="工坊设施"><button data-station="furnace">炉火</button><button data-station="anvil">铁砧</button><button data-station="tribute">贡台</button><button data-station="relics">遗物购买台</button><button id="merchant-shortcut" data-station="merchant">幽灵商人</button></nav>
+   <section id="station-panel" class="station-panel hidden" aria-label="设施操作"></section>
+   <div id="shop-target-info" class="shop-target-info hidden"></div>
+   <div id="forge-controls" class="forge-controls hidden"><div id="forge-readout" class="forge-readout touch-only"></div><details class="mobile-odds touch-only"><summary id="odds-summary">抽签概率</summary><div id="odds-grid" class="odds-grid"></div></details><div class="heat-strip"><span>剑刃</span><div><i id="heat-fill"></i></div><b id="heat-label">未加热</b></div><div class="forge-actions"><button id="strike" class="primary">敲击铁砧 <kbd>Space</kbd></button><button id="reheat">♨ 加热</button><button id="take-anvil">取剑 <kbd>E</kbd></button><button id="leave-anvil">留下剑 <kbd>右键</kbd></button></div><div id="frenzy-label" class="frenzy-label"></div><details id="forge-items" class="forge-items" open><summary>消耗品与回溯</summary><div id="item-toolbar" class="item-toolbar"></div><div class="item-actions"><button id="use-item">Q 使用</button><button id="undo">R 回溯上一锤</button></div></details></div>
+  </div>
+  <section id="intro-layer" class="intro-layer hidden" role="dialog" aria-modal="true" aria-labelledby="intro-speaker" aria-describedby="intro-text">
+   <div class="intro-topline"><span>新合约 · 工坊导览</span><button id="intro-skip">跳过导览 <kbd>Esc</kbd></button></div>
+   <div class="intro-dialogue">
+    <div class="intro-speaker-row"><h2 id="intro-speaker">巨龙</h2><span id="intro-progress"></span></div>
+    <p id="intro-text" aria-live="polite"></p>
+    <div class="intro-bottomline"><p id="intro-hint"></p><div class="intro-buttons"><button id="intro-previous" aria-label="上一句">←</button><button id="intro-next">继续 <span aria-hidden="true">→</span></button></div></div>
+   </div>
+  </section>
+  <div id="modal-layer" class="modal-layer hidden"><section id="modal" role="dialog" aria-modal="true"></section></div>
+ </main>
+ <script type="module" src="/src/main.js"></script>
+</body></html>

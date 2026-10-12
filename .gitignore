@@ -1,0 +1,12 @@
+node_modules/
+.openai/
+dist/
+.wrangler/
+*.tar.gz
+.env
+.env.*
+!.env.example
+outputs/
+*.zip
+*.log
+.DS_Store
