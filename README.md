@@ -4,6 +4,26 @@
 
 **[在线游玩](https://dwarf-forge.gizeta.eu.org/) · [GitHub 源码](https://github.com/AtarisMio/dwarf-forge)**
 
+## 游戏截图
+
+桌面工坊：炉火、铁砧、贡台与遗物购买台。
+
+![Dwarf Forge 桌面工坊与主菜单](docs/screenshots/workshop.jpg)
+
+票数看板：一格一票，遗物加票与机制加票分栏展示，可展开查看机制来源。
+
+![方格票数看板与独立机制来源面板](docs/screenshots/ticket-board.jpg)
+
+手机竖屏：加热剑刃与查看方格票数。点击图片可查看原尺寸。
+
+<table>
+  <tr><th>炉火加热</th><th>票数与机制</th></tr>
+  <tr>
+    <td><a href="docs/screenshots/mobile-heating.jpg"><img src="docs/screenshots/mobile-heating.jpg" width="260" alt="手机竖屏炉火界面，剑刃加热后呈红热状态"></a></td>
+    <td><a href="docs/screenshots/mobile-tickets.jpg"><img src="docs/screenshots/mobile-tickets.jpg" width="260" alt="手机竖屏方格票数表，基础、遗物与机制分栏展示"></a></td>
+  </tr>
+</table>
+
 ## 本地运行
 
 需要 Node.js 22.12 或更高版本，以及支持 WebGL 的现代浏览器。
