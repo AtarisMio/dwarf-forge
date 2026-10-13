@@ -7,22 +7,23 @@ const ink='#59462c';
 const hideSurface=parchmentSurface(1600,800,'ticket-wall-hide');
 function boardArt(snapshot){
   const rows=ticketRows(snapshot),total=rows.reduce((sum,row)=>sum+row.total,0);
+  const left=140,right=1460;
   let body=hideSurface;
-  body+=svgText('抽签票',68,49,{size:34,color:ink,anchor:'start',weight:400});
-  body+=svgText(snapshot?.active?snapshot.swordName??'铁砧上的剑':'铁砧未放剑',1518,49,{size:25,color:'#826c49',anchor:'end',weight:400});
+  body+=svgText('抽签票',left,92,{size:34,color:ink,anchor:'start',weight:400});
+  body+=svgText(snapshot?.active?snapshot.swordName??'铁砧上的剑':'铁砧未放剑',right,92,{size:25,color:'#826c49',anchor:'end',weight:400});
   rows.forEach((row,index)=>{
-    const y=103+index*104;
-    body+=svgText(row.label,68,y+25,{size:40,color:ink,anchor:'start',weight:400});
-    body+=ticketRowGlyphs(row,{id:row.id,x:310,y,width:1050,height:50,size:26});
-    body+=svgText(row.total,1518,y+25,{size:32,color:ink,anchor:'end',weight:400});
+    const y=140+index*90;
+    body+=svgText(row.label,left,y+25,{size:40,color:ink,anchor:'start',weight:400});
+    body+=ticketRowGlyphs(row,{id:row.id,x:375,y,width:970,height:50,size:26});
+    body+=svgText(row.total,right,y+25,{size:32,color:ink,anchor:'end',weight:400});
     if(row.mechanicAdded){
-      body+=svgText('机制',253,y+66,{size:18,color:'#6c7146',anchor:'start',weight:400});
-      body+=ticketRowGlyphs(row,{id:row.id,part:'mechanic',x:310,y:y+53,width:1050,height:28,size:20});
+      body+=svgText('机制',318,y+66,{size:18,color:'#6c7146',anchor:'start',weight:400});
+      body+=ticketRowGlyphs(row,{id:row.id,part:'mechanic',x:375,y:y+53,width:970,height:28,size:20});
     }
   });
-  body+='<path d="M68 652Q800 657 1518 653" fill="none" stroke="#7a6442" stroke-width="2"/>';
-  body+=svgText(`共 ${total} 张`,68,693,{size:33,color:ink,anchor:'start',weight:400});
-  body+=svgText('强化风险体现在铁砧牌上',68,748,{size:25,color:'#71573a',anchor:'start',weight:400});
+  body+=`<path d="M${left} 620Q800 625 ${right} 620" fill="none" stroke="#7a6442" stroke-width="2"/>`;
+  body+=svgText(`共 ${total} 张`,left,663,{size:33,color:ink,anchor:'start',weight:400});
+  body+=svgText('强化风险体现在铁砧牌上',left,713,{size:25,color:'#71573a',anchor:'start',weight:400});
   return body;
 }
 

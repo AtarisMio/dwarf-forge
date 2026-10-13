@@ -5,7 +5,7 @@
 .touch-ui #station-panel.ticket-station button{font-size:12px;padding:9px 13px}
 #modal.ticket-sheet-modal{width:min(650px,calc(100% - 28px));background:var(--ticket-hide-background) center/100% 100% no-repeat;border:0;color:#514326;padding:36px;box-shadow:none;filter:drop-shadow(0 12px 22px #000b)}
 #modal.ticket-sheet-modal h2{color:#514326;letter-spacing:2px;margin-bottom:24px;font:500 24px 'Noto Serif SC','Songti SC',serif}
-.ticket-sheet-modal .modal-eyebrow:empty{display:none}.ticket-sheet-modal .modal-close{color:#6e5935}
+.ticket-sheet-modal .modal-eyebrow:empty{display:none}#modal.ticket-sheet-modal .modal-close{color:#6e5935;right:18px;top:18px}
 .ticket-sheet{font-family:'Noto Serif SC','Songti SC',STSong,Georgia,serif;color:#514326}
 .ticket-sheet-row{display:grid;grid-template-columns:66px minmax(0,1fr)40px;align-items:center;gap:10px;min-height:54px;margin:8px 0}
 .ticket-sheet-label{font-size:19px;white-space:nowrap}.ticket-sheet-total{text-align:right;font-size:14px;color:#6a5235;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -13,7 +13,8 @@
 .ticket-sheet-mechanic{display:grid;grid-template-columns:66px minmax(0,1fr)40px;align-items:center;gap:10px;margin:-5px 0 12px}.ticket-sheet-mechanic>small{font:11px 'Noto Sans SC',sans-serif;color:#6f583a}
 .ticket-sheet-footer{border-top:1px solid #927b4b77;margin-top:20px;padding-top:14px;font-size:16px}.ticket-sheet-footer small{display:block;margin-top:7px;font-size:12px;color:#6f5634;line-height:1.6}
 .ticket-sheet-modal .ticket-mechanisms{border-color:#927b4b55}.ticket-sheet-modal .ticket-mechanisms>summary{color:#665132}.ticket-sheet-modal .ticket-source{border-color:#927b4b44}.ticket-sheet-modal .ticket-source b{color:#514326}.ticket-sheet-modal .ticket-source small,.ticket-sheet-modal .note{color:#7b6846!important}
-@media(max-width:560px){#modal.ticket-sheet-modal{padding:32px 24px}.ticket-sheet-row,.ticket-sheet-mechanic{grid-template-columns:48px minmax(0,1fr)30px;gap:6px}.ticket-sheet-label{font-size:16px}.ticket-sheet-total{font-size:12px}.ticket-sheet-row{min-height:48px}.ticket-sheet-footer{font-size:14px}}
+.touch-ui #modal.ticket-sheet-modal{padding:32px 26px}
+@media(max-width:560px){.ticket-sheet-row,.ticket-sheet-mechanic{grid-template-columns:48px minmax(0,1fr)30px;gap:6px}.ticket-sheet-label{font-size:16px}.ticket-sheet-total{font-size:12px}.ticket-sheet-row{min-height:48px}.ticket-sheet-footer{font-size:14px}}
 @media(max-height:520px) and (orientation:landscape){.touch-ui #station-panel.ticket-station{bottom:calc(22px + var(--safe-bottom))}}
 .ticket-square-scroll{display:block;max-height:90px;overflow:auto;overscroll-behavior:contain}
 .ticket-squares{display:block;max-width:100%;margin:auto}
