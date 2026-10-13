@@ -10,9 +10,9 @@
 
 ![Dwarf Forge 桌面工坊与主菜单](docs/screenshots/workshop.jpg)
 
-票数看板：一格一票，遗物加票与机制加票分栏展示，可展开查看机制来源。
+羊皮纸票数看板：基础票用空心方格，遗物加票用绿色「＋」，移除票在原方格上打叉；机制加票在对应结果下方单独显示。
 
-![方格票数看板与独立机制来源面板](docs/screenshots/ticket-board.jpg)
+![羊皮纸票数看板，空心基础票、绿色加票与划销票](docs/screenshots/ticket-board.jpg)
 
 手机竖屏：加热剑刃与查看方格票数。点击图片可查看原尺寸。
 
@@ -20,7 +20,7 @@
   <tr><th>炉火加热</th><th>票数与机制</th></tr>
   <tr>
     <td><a href="docs/screenshots/mobile-heating.jpg"><img src="docs/screenshots/mobile-heating.jpg" width="260" alt="手机竖屏炉火界面，剑刃加热后呈红热状态"></a></td>
-    <td><a href="docs/screenshots/mobile-tickets.jpg"><img src="docs/screenshots/mobile-tickets.jpg" width="260" alt="手机竖屏方格票数表，基础、遗物与机制分栏展示"></a></td>
+    <td><a href="docs/screenshots/mobile-tickets.jpg"><img src="docs/screenshots/mobile-tickets.jpg" width="260" alt="手机竖屏放大票纸，每种结果一行，机制加票独立显示"></a></td>
   </tr>
 </table>
 
@@ -54,7 +54,7 @@ npm run build
 
 手机支持横屏和竖屏：左侧摇杆移动，滑动画面观察，轻点目标或“交互”按钮操作。“设施”菜单可前往炉火、铁砧、贡台、购买台及票数看板。详细说明见 [手机体验](docs/mobile-experience.md)。
 
-后墙看板以一格一票显示当前铁砧剑的原始抽签票增减；基准票、遗物加票、机制加票与划销移除票分开展示，设施面板可展开查看每项机制来源。手机详情同样使用方格，铁砧界面显示最终概率。剑的外观由最高达到的等级决定，损伤保留外观，回溯恢复上一锤形态。基础剑从共同形态发展到三个方向和六个家族，另有三种商人剑路线。
+后墙羊皮纸以一格一票显示当前铁砧剑的原始抽签票：每种结果一行，空心基础票后接绿色遗物加票，移除票直接打叉，机制加票在下方独立一行。小计与总票数辅助核对，具名加票来源按需打开；手机可放大票纸。铁砧界面显示最终概率。剑的外观由最高达到的等级决定，损伤保留外观，回溯恢复上一锤形态。基础剑从共同形态发展到三个方向和六个家族，另有三种商人剑路线。
 
 ## 技术结构
 

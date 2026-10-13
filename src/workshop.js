@@ -748,8 +748,7 @@ export function createWorkshop(container, callbacks = {}) {
     if (focused === 'anvil') focusPosition.z += THREE.MathUtils.clamp(1.32 / camera.aspect - 1, 0, 1.7) * 1.9;
     const target = new THREE.Vector3(...stationViews[focused].look);
     if (focused === 'tickets') {
-      const sidePanel = camera.aspect > 1 && container.clientHeight <= 520 && !!window.matchMedia?.('(pointer: coarse), (max-width: 760px)').matches;
-      const view = getTicketFocusView(camera.aspect, camera.fov, sidePanel); focusPosition.copy(view.position); target.copy(view.look);
+      const view = getTicketFocusView(camera.aspect, camera.fov); focusPosition.copy(view.position); target.copy(view.look);
     }
     const lookCamera = new THREE.PerspectiveCamera(); lookCamera.position.copy(focusPosition); lookCamera.lookAt(target); focusQuaternion.copy(lookCamera.quaternion);
   }

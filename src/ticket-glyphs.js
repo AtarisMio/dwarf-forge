@@ -1,42 +1,86 @@
-// Each pattern tile contains exactly one ticket. Full rows and a partial last
-// row keep even accumulated tickets exact without creating thousands of nodes.
-export const TICKET_COLORS={base:'#c6c3ac',added:'#a2cba7',mechanic:'#a5c7dc',removed:'#da927b',total:'#e4c686'};
+export const TICKET_COLORS={base:'#59462c',added:'#365c35',mechanic:'#365c35',removed:'#59462c',total:'#59462c'};
+export const TICKET_CATEGORIES=[
+  {id:'break',label:'碎裂',base:9},{id:'damage',label:'损伤',base:2},
+  {id:'hold',label:'维持',base:5},{id:'success',label:'成功',base:12},{id:'great',label:'大成功',base:2}
+];
 export const ticketCount=value=>Number.isSafeInteger(value)&&value>=0?value:0;
 const xml=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 export const ticketEffectLabel=label=>String(label).replace(/\s*\+\d+\s*票/gu,'加票');
 
-export function ticketSquares(value,{id,x=0,y=0,width=250,height=56,size=22,mode='base',columns}={}){
-  const count=ticketCount(value),color=TICKET_COLORS[mode]??TICKET_COLORS.base;
-  const key=String(id??'tickets').replace(/[^a-zA-Z0-9_-]/g,'_'),patternId=`ticket-${key}`;
-  let body=`<g data-ticket-group="${xml(id??'tickets')}" data-count="${count}">`;
-  if(!count)return body+`<path d="M${x+width/2-8} ${y+height/2}h16" stroke="#657060" stroke-width="2"/></g>`;
-  let step=size/0.76;
-  let cols=columns??Math.max(1,Math.floor(width/step));
+// Removal cancels existing tickets in order; it never creates a second pool.
+export function ticketRowCounts(row){
+  const base=ticketCount(row.base),mechanicAdded=ticketCount(row.mechanicAdded);
+  const relicAdded=ticketCount(row.relicAdded??Math.max(0,ticketCount(row.added)-mechanicAdded));
+  const removed=ticketCount(row.removed),baseRemoved=Math.min(base,removed);
+  const relicRemoved=Math.min(relicAdded,removed-baseRemoved);
+  const mechanicRemoved=Math.min(mechanicAdded,removed-baseRemoved-relicRemoved);
+  return {base,relicAdded,mechanicAdded,removed,baseRemoved,relicRemoved,mechanicRemoved,total:base+relicAdded+mechanicAdded-removed};
+}
+export function ticketRows(snapshot){
+  return TICKET_CATEGORIES.map(category=>{
+    const source=snapshot?.active?snapshot.rows?.find(row=>row.id===category.id):null;
+    return {...category,...source,...ticketRowCounts(source??category),label:category.id==='hold'?category.label:source?.label??category.label};
+  });
+}
+function tileLayout(count,{x=0,y=0,width=250,height=56,size=22,columns}={}){
+  let step=size/.76,cols=columns??Math.max(1,Math.floor(width/step));
   if(!columns&&count>cols*Math.max(1,Math.floor(height/step)))cols=Math.ceil(Math.sqrt(count*width/height));
-  cols=Math.max(1,Math.min(count,cols));
-  const rows=Math.ceil(count/cols);
-  step=Math.min(step,width/cols,height/rows);
-  const square=step*.76,gap=(step-square)/2;
-  const left=x+(width-cols*step)/2,top=y+(height-rows*step)/2;
-  const fullRows=Math.floor(count/cols),remaining=count%cols;
-  const tile=mode==='removed'
-    ?`<rect x="${gap}" y="${gap}" width="${square}" height="${square}" fill="none" stroke="${color}" stroke-width="${step*.075}"/><path d="M${gap} ${gap}l${square} ${square}M${gap+square} ${gap}l${-square} ${square}" stroke="${color}" stroke-width="${step*.075}"/>`
-    :`<rect x="${gap}" y="${gap}" width="${square}" height="${square}" fill="${color}"/>`;
-  body+=`<defs><pattern id="${patternId}" x="${left}" y="${top}" width="${step}" height="${step}" patternUnits="userSpaceOnUse">${tile}</pattern></defs>`;
-  if(fullRows)body+=`<rect x="${left}" y="${top}" width="${cols*step}" height="${fullRows*step}" fill="url(#${patternId})"/>`;
-  if(remaining)body+=`<rect x="${left}" y="${top+fullRows*step}" width="${remaining*step}" height="${step}" fill="url(#${patternId})"/>`;
+  cols=Math.max(1,Math.min(Math.max(1,count),cols));
+  step=Math.min(step,width/cols,height/Math.max(1,Math.ceil(count/cols)));
+  return {x,y,step,columns:cols};
+}
+
+// Patterns preserve full and partial rows without a node for every ticket.
+// All pools share one grid so direct relic tiles append to baseline tickets.
+export function ticketSquares(value,{id,x=0,y=0,width=250,height=56,size=22,mode='base',columns,removed=0,layout,start=0}={}){
+  const count=ticketCount(value),crossed=mode==='removed'?count:Math.min(count,ticketCount(removed));
+  const color=TICKET_COLORS[mode]??TICKET_COLORS.base;
+  const key=String(id??'tickets').replace(/[^a-zA-Z0-9_-]/g,'_'),patternId=`ticket-${key}`;
+  let body=`<g data-ticket-group="${xml(id??'tickets')}" data-count="${count}" data-removed="${crossed}" data-live="${count-crossed}">`;
+  if(!count)return body+'</g>';
+  const grid=layout??tileLayout(count,{x,y,width,height,size,columns});
+  const step=grid.step,square=step*.76,gap=(step-square)/2;
+  const added=mode==='added'||mode==='mechanic';
+  const tile=`<rect x="${gap}" y="${gap}" width="${square}" height="${square}" fill="${added?color:'none'}"${added?'':` stroke="${color}" stroke-width="${step*.055}"`}/>`
+    +(added?`<path d="M${step*.5} ${step*.28}v${step*.44}M${step*.28} ${step*.5}h${step*.44}" stroke="#f5e8c7" stroke-width="${step*.08}"/>`:'');
+  const cross=`<path d="M${gap} ${gap}l${square} ${square}M${gap+square} ${gap}l${-square} ${square}" stroke="#59462c" stroke-width="${step*.085}"/>`;
+  body+=`<defs><pattern id="${patternId}" x="${grid.x}" y="${grid.y}" width="${step}" height="${step}" patternUnits="userSpaceOnUse">${tile}</pattern>`
+    +`<pattern id="${patternId}-crossed" x="${grid.x}" y="${grid.y}" width="${step}" height="${step}" patternUnits="userSpaceOnUse">${tile}${cross}</pattern></defs>`;
+  function range(first,length,pattern){
+    let index=first,left=length,result='';
+    const rect=(column,row,n,rows=1)=>`<rect x="${grid.x+column*step}" y="${grid.y+row*step}" width="${n*step}" height="${rows*step}" fill="url(#${pattern})"/>`;
+    const column=index%grid.columns;
+    if(column&&left){const n=Math.min(left,grid.columns-column);result+=rect(column,Math.floor(index/grid.columns),n);index+=n;left-=n;}
+    const fullRows=Math.floor(left/grid.columns);
+    if(fullRows){result+=rect(0,Math.floor(index/grid.columns),grid.columns,fullRows);index+=fullRows*grid.columns;left-=fullRows*grid.columns;}
+    if(left)result+=rect(0,Math.floor(index/grid.columns),left);
+    return result;
+  }
+  body+=range(start,count-crossed,patternId)+range(start+count-crossed,crossed,`${patternId}-crossed`);
   return body+'</g>';
 }
-
+export function ticketRowGlyphs(row,{id=row.id,part='main',x=0,y=0,width=250,height=56,size=22}={}){
+  const counts=ticketRowCounts(row);
+  if(part==='mechanic')return ticketSquares(counts.mechanicAdded,{id:`${id}-mechanicAdded`,x,y,width,height,size,mode:'mechanic',removed:counts.mechanicRemoved});
+  const layout=tileLayout(counts.base+counts.relicAdded,{x,y,width,height,size});
+  return ticketSquares(counts.base,{id:`${id}-base`,mode:'base',removed:counts.baseRemoved,layout})
+    +ticketSquares(counts.relicAdded,{id:`${id}-relicAdded`,mode:'added',removed:counts.relicRemoved,layout,start:counts.base});
+}
 export function ticketCell(value,{id,mode='base'}={}){
-  const count=ticketCount(value),height=Math.max(10,Math.ceil(count/5)*10);
-  return `<span class="ticket-square-scroll"><svg class="ticket-squares" xmlns="http://www.w3.org/2000/svg" width="50" height="${height}" viewBox="0 0 50 ${height}" role="img" aria-label="${count?`${count}票${mode==='removed'?'，划销移除':''}`:'无票'}">${ticketSquares(count,{id,width:50,height,size:7.6,mode,columns:5})}</svg></span>`;
+  const count=ticketCount(value),height=Math.max(16,Math.min(84,Math.ceil(count/20)*14));
+  return `<svg class="ticket-squares" xmlns="http://www.w3.org/2000/svg" width="240" height="${height}" viewBox="0 0 240 ${height}" role="img" aria-label="${count}票${mode==='removed'?'，划销移除':''}">${ticketSquares(count,{id,width:240,height,size:9,mode})}</svg>`;
 }
-
-const outcomeLabels={break:'碎裂',damage:'损伤',hold:'保持',success:'成功',great:'大成功'};
+function rowSvg(row,part){
+  const count=part==='main'?row.base+row.relicAdded:row.mechanicAdded;
+  const height=Math.max(24,Math.min(96,Math.ceil(count/12)*24));
+  const removed=part==='main'?row.baseRemoved+row.relicRemoved:row.mechanicRemoved;
+  return `<svg class="ticket-squares" xmlns="http://www.w3.org/2000/svg" width="240" height="${height}" viewBox="0 0 240 ${height}" role="img" aria-label="${count}票，划销${removed}票">${ticketRowGlyphs(row,{id:`touch-${row.id}`,part,width:240,height,size:15})}</svg>`;
+}
 export function ticketReadout(snapshot){
-  return `<table class="ticket-readout"><caption>一格一票 · 蓝色为机制加票 · 划销表示移除</caption><thead><tr><th>结果</th><th>基准</th><th>遗物</th><th>机制</th><th>移除</th><th>当前</th></tr></thead><tbody>${snapshot.rows.map(row=>`<tr data-ticket-outcome="${xml(row.id)}"><th scope="row">${xml(row.label)}</th>${[['base',row.base,'base'],['relicAdded',row.relicAdded??row.added,'added'],['mechanicAdded',row.mechanicAdded??0,'mechanic'],['removed',row.removed,'removed'],['total',row.total,'total']].map(([field,value,mode])=>`<td>${ticketCell(value,{id:`touch-${row.id}-${field}`,mode})}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const rows=ticketRows(snapshot),total=rows.reduce((sum,row)=>sum+row.total,0);
+  return `<div class="ticket-sheet">${rows.map(row=>`<div class="ticket-sheet-row" data-ticket-outcome="${xml(row.id)}"><span class="ticket-sheet-label">${xml(row.label)}</span><span class="ticket-sheet-glyphs">${rowSvg(row,'main')}</span><small class="ticket-sheet-total">${row.total}张</small></div>${row.mechanicAdded?`<div class="ticket-sheet-mechanic"><small>机制</small><span class="ticket-sheet-glyphs">${rowSvg(row,'mechanic')}</span></div>`:''}`).join('')}<div class="ticket-sheet-footer"><span>共 ${total} 张</span><small>强化风险体现在铁砧牌上</small></div></div>`;
 }
+const outcomeLabels=Object.fromEntries(TICKET_CATEGORIES.map(row=>[row.id,row.label]));
 export function ticketMechanisms(sources=[]){
   const mechanisms=sources.filter(source=>source.kind==='mechanic'&&(source.added||source.removed));
   return `<details class="ticket-mechanisms"><summary>机制与临时加票来源</summary>${mechanisms.length?mechanisms.map((source,index)=>`<div class="ticket-source"><div><b>${xml(source.label)}</b><small>${xml(outcomeLabels[source.outcome]??source.outcome)} · ${source.removed?'移除':'增加'}</small></div>${ticketCell(source.removed||source.added,{id:`mechanism-${index}`,mode:source.removed?'removed':'mechanic'})}</div>`).join(''):'<p class="note">当前没有机制加票。累积与下一锤效果会在这里单独列出。</p>'}</details>`;

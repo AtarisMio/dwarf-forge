@@ -1,9 +1,20 @@
 .touch-only{display:none}
-.touch-ui .ticket-readout{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;line-height:1.25;margin:4px 0 8px}
-.touch-ui .ticket-readout th,.touch-ui .ticket-readout td{padding:8px 1px;border-bottom:1px solid #8b795e36;text-align:center;vertical-align:middle}
-.touch-ui .ticket-readout th:first-child{text-align:left}
-.touch-ui .ticket-readout thead{color:#b8a486;font-size:12px}
-.touch-ui .ticket-readout caption{text-align:left;font-size:11px;color:#b8a486;padding:4px 0 10px}
+#station-panel.ticket-station{left:50%;right:auto;top:auto;bottom:82px;transform:translateX(-50%);display:flex;justify-content:center;gap:8px;width:max-content;max-width:calc(100% - 24px);max-height:none;padding:0;background:none;border:0;box-shadow:none;overflow:visible}
+#station-panel.ticket-station button{min-height:44px;padding:9px 18px;font-size:12px;background:#17130ddd;border:1px solid #a0896255;white-space:nowrap}
+.touch-ui #station-panel.ticket-station{bottom:calc(78px + var(--safe-bottom));width:max-content}
+.touch-ui #station-panel.ticket-station button{font-size:12px;padding:9px 13px}
+#modal.ticket-sheet-modal{width:min(650px,calc(100% - 28px));background:radial-gradient(ellipse at 45% 30%,#eee0b7,#d9c395 95%);border-color:#b09b70;color:#514326;padding:28px;box-shadow:0 16px 70px #0009}
+#modal.ticket-sheet-modal h2{color:#514326;letter-spacing:2px;margin-bottom:24px;font:500 24px 'Noto Serif SC','Songti SC',serif}
+.ticket-sheet-modal .modal-eyebrow:empty{display:none}.ticket-sheet-modal .modal-close{color:#6e5935}
+.ticket-sheet{font-family:'Noto Serif SC','Songti SC',STSong,Georgia,serif;color:#514326}
+.ticket-sheet-row{display:grid;grid-template-columns:66px minmax(0,1fr)40px;align-items:center;gap:10px;min-height:54px;margin:8px 0}
+.ticket-sheet-label{font-size:19px;white-space:nowrap}.ticket-sheet-total{text-align:right;font-size:14px;color:#7b6846;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ticket-sheet-glyphs{display:block;min-width:0}.ticket-sheet-glyphs svg{display:block;width:100%;max-width:320px;height:auto;margin:0}
+.ticket-sheet-mechanic{display:grid;grid-template-columns:66px minmax(0,1fr)40px;align-items:center;gap:10px;margin:-5px 0 12px}.ticket-sheet-mechanic>small{font:11px 'Noto Sans SC',sans-serif;color:#806e4d}
+.ticket-sheet-footer{border-top:1px solid #927b4b77;margin-top:20px;padding-top:14px;font-size:16px}.ticket-sheet-footer small{display:block;margin-top:7px;font-size:12px;color:#8b7750;line-height:1.6}
+.ticket-sheet-modal .ticket-mechanisms{border-color:#927b4b55}.ticket-sheet-modal .ticket-mechanisms>summary{color:#665132}.ticket-sheet-modal .ticket-source{border-color:#927b4b44}.ticket-sheet-modal .ticket-source b{color:#514326}.ticket-sheet-modal .ticket-source small,.ticket-sheet-modal .note{color:#7b6846!important}
+@media(max-width:560px){#modal.ticket-sheet-modal{padding:24px 16px}.ticket-sheet-row,.ticket-sheet-mechanic{grid-template-columns:48px minmax(0,1fr)30px;gap:6px}.ticket-sheet-label{font-size:16px}.ticket-sheet-total{font-size:12px}.ticket-sheet-row{min-height:48px}.ticket-sheet-footer{font-size:14px}}
+@media(max-height:520px) and (orientation:landscape){.touch-ui #station-panel.ticket-station{bottom:calc(22px + var(--safe-bottom))}}
 .ticket-square-scroll{display:block;max-height:90px;overflow:auto;overscroll-behavior:contain}
 .ticket-squares{display:block;max-width:100%;margin:auto}
 .ticket-mechanisms{margin-top:12px;border-top:1px solid #8b795e36;padding-top:10px;pointer-events:auto}

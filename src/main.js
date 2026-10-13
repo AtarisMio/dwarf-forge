@@ -1,5 +1,5 @@
 import './style.css';
-import {ticketReadout,ticketEffectLabel,ticketMechanisms} from './ticket-glyphs.js';
+import {ticketReadout,ticketMechanisms} from './ticket-glyphs.js';
 import './mobile.css';
 import {ForgeGame, RELICS, ITEMS, SWORD_TYPES, money} from './simulation.js';
 import {createWorkshop} from './workshop.js';
@@ -79,6 +79,7 @@ function closeModal() {
 }
 function showModal(kind, content) {
   cancelHeating(); audio.stopDragon(); modalKind = kind; $('hud').inert = true;
+  $('modal').classList.toggle('ticket-sheet-modal',kind==='ticket-sheet');
   $('modal').innerHTML = content; $('modal-layer').classList.remove('hidden'); syncPause();
   renderTarget(target);
   $('modal').querySelector('button')?.focus({preventScroll:true});
@@ -235,6 +236,7 @@ function selectedBlade(w = held()) {
 function renderStation() {
   const p = $('station-panel'), s = game.state, w = held();
   p.classList.toggle('shop-station', station === 'relics');
+  p.classList.toggle('ticket-station',station==='tickets');
   if(!station || station === 'anvil') { p.classList.add('hidden'); return; }
   p.classList.remove('hidden');
   const heading = `<div class="station-heading"><h2>${labels[station]}</h2><button data-action="leave" aria-label="离开设施">×</button></div>`;
@@ -248,12 +250,14 @@ function renderStation() {
   } else if(station === 'merchant') {
     p.innerHTML = heading + `<p class="station-kicker">THE WANDERING GHOST</p><p>今天到访的货物数量有限。<br>下次到访：第 ${s.day+3} 日。</p><div class="merchant-list">${game.merchantStock.map(i => `<button class="merchant-row" data-merchant="${i.id}" ${i.remaining<=0 || s.gold<i.price?'disabled':''}><span>${esc(i.name)}<small>${i.remaining>0?`剩余 ${i.remaining}`:'售罄'}</small></span><b>${money(i.price)} G</b></button>`).join('')}</div>`;
   } else if(station === 'tickets') {
-    const ticketOpen=p.querySelector('.ticket-details')?.open ?? false;
     const ticketData=game.ticketDisplay(anvil()??null);
-    const mechanismsOpen=p.querySelector('.ticket-mechanisms')?.open??false;
-    p.innerHTML = heading + '<p class="station-kicker">DRAW TICKETS</p>' + (isTouchUI()?`<details class="ticket-details" ${ticketOpen?'open':''}><summary>查看票数方格</summary>${ticketReadout(ticketData)}<p class="note">${ticketData.active?ticketData.temporary.map(effect=>esc(ticketEffectLabel(effect.label))).join('；')||'以铁砧上的剑为准。':'铁砧未放剑，显示基础票。'}</p></details>`:'<p>一格一票。浅色为基础票，绿色为遗物加票，蓝色为机制加票，红色划销为移除票，金色为当前票。</p>') + ticketMechanisms(ticketData.sources) + '<p class="note">最终概率请看铁砧上的看板。</p><button class="wide" data-action="leave">返回工坊</button>';
-    if(mechanismsOpen)p.querySelector('.ticket-mechanisms').open=true;
+    p.innerHTML = `${isTouchUI()?'<button data-action="ticket-sheet">放大票纸</button>':''}${ticketData.sources.some(source=>source.kind==='mechanic')?'<button data-action="ticket-sources">加票来源</button>':''}<button data-action="leave">返回工坊</button>`;
   }
+}
+function showTicketSheet(sources=false) {
+  const data=game.ticketDisplay(anvil()??null);
+  showModal('ticket-sheet',modalHeader('','抽签票')+ticketReadout(data)+(data.sources.some(source=>source.kind==='mechanic')?ticketMechanisms(data.sources):''));
+  if(sources){const details=$('modal').querySelector('.ticket-mechanisms');if(details)details.open=true;}
 }
 async function heatBlade() {
   if(!running() || modalKind || station!=='furnace' || !held() || held().heat>0 || !interactionReady()) return;
@@ -420,6 +424,7 @@ function showPause() {
   save(); showModal('pause',modalHeader('THE FIRE CAN WAIT','炉火暂歇',`存档 ${saves.activeSlot+1} · 第 ${game.state.day} 日。暂停期间狂热计时停止。`) + '<div class="menu-actions"><button class="primary" data-action="close">继续锻造</button><button data-action="saves">三个存档</button><button data-action="codex">图鉴</button><button data-action="help">操作说明</button><button data-action="confirm-restart">新合约</button></div>' + `<label class="settings-check"><input type="checkbox" id="sound-check" ${audio.enabled?'checked':''}> 工坊环境、锤击与巨龙低吼</label><details class="assist-controls"><summary>设施快捷操作</summary><div class="menu-actions">${Object.entries(labels).filter(([id]) => id!=='merchant' || game.merchantAvailable).map(([id,label]) => `<button data-travel="${id}">${label}</button>`).join('')}</div></details><div class="project-footer"><span>Dwarf Forge · MIT 开源</span><a class="project-link" href="https://github.com/AtarisMio/dwarf-forge" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看 Dwarf Forge 源码（新标签页）"><span aria-hidden="true">&lt;/&gt;</span><span>GitHub · 源码 / Star</span><span class="project-link-arrow" aria-hidden="true">↗</span></a></div><p class="footer-note">独立网页实现 · 原作 <a href="https://store.steampowered.com/app/5245810/ForgeTax/" target="_blank" rel="noopener noreferrer">ForgeTax</a>。部分精确数据仍参考实玩资料；自制模型与音效。</p>`);
 }
 const actions = {
+  'ticket-sheet':()=>showTicketSheet(), 'ticket-sources':()=>showTicketSheet(true),
   close:closeModal, leave:leaveStation, heat:heatBlade, blades:() => showBlades(), shop:showShop, owned:showOwned,
   offer:() => held() && result(() => game.offer(held().id),'剑已放在贡台，敲铃前可取回。'),
   'tribute-blades':() => showBlades('tribute-blades'), settle:() => ringBell(), 'force-settle':() => ringBell(true),

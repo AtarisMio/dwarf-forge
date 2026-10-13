@@ -1,34 +1,27 @@
 import * as THREE from 'three';
 import {createVectorPanel, svgText} from './vector-panels.js';
-import {ticketSquares, ticketEffectLabel} from './ticket-glyphs.js';
+import {ticketRows, ticketRowGlyphs} from './ticket-glyphs.js';
 
-const CATEGORIES = [
-  {id:'break',label:'碎裂',base:9}, {id:'damage',label:'损伤',base:2},
-  {id:'hold',label:'保持',base:5}, {id:'success',label:'成功',base:12},
-  {id:'great',label:'大成功',base:2}
-];
-const ink='#d8d0b5', brass='#cbb578', green='#92b59b';
-const safeNumber=value=>Number.isFinite(value)&&value>=0?value:0;
+const ink='#59462c';
 function boardArt(snapshot){
-  const active=!!snapshot?.active;
-  let body='<rect width="1600" height="765" fill="#151d19"/><rect x="14" y="14" width="1572" height="737" rx="3" fill="none" stroke="#83764e" stroke-width="3"/>';
-  body+=svgText('DRAW TICKETS',800,47,{size:26,color:brass,weight:500})+svgText('抽签票数',800,93,{size:48,color:ink});
-  body+=svgText(active?snapshot.swordName??'当前铁砧剑':'铁砧未放剑',800,143,{size:29,color:'#b0b4a1',weight:400});
-  for(const [text,x] of [['结果',180],['基准',450],['遗物加票',660],['机制加票',875],['移除',1090],['当前',1390]])body+=svgText(text,x,201,{size:29,color:brass});
-  CATEGORIES.forEach((category,index)=>{
-    const row=active?snapshot.rows?.find(r=>r.id===category.id):null,y=257+index*70;
-    const base=row?safeNumber(row.base):category.base,relicAdded=row?safeNumber(row.relicAdded??row.added):0,mechanicAdded=row?safeNumber(row.mechanicAdded):0,removed=row?safeNumber(row.removed):0,total=row?safeNumber(row.total):base;
-    body+=`<path d="M60 ${y+35}H1540" stroke="#4b5140" stroke-width="1"/>`;
-    body+=svgText(category.label,180,y,{size:40,color:ink});
-    for(const [field,value,center,width,mode] of [['base',base,450,170,'base'],['relicAdded',relicAdded,660,188,'added'],['mechanicAdded',mechanicAdded,875,188,'mechanic'],['removed',removed,1090,188,'removed'],['total',total,1390,232,'total']]){
-      body+=ticketSquares(value,{id:`${category.id}-${field}`,x:center-width/2,y:y-28,width,height:56,mode});
+  const rows=ticketRows(snapshot),total=rows.reduce((sum,row)=>sum+row.total,0);
+  let body='<defs><linearGradient id="paper-wash" x2="1" y2="1"><stop stop-color="#ead8ae"/><stop offset=".53" stop-color="#e3cea0"/><stop offset="1" stop-color="#dac293"/></linearGradient></defs>';
+  body+='<rect width="1600" height="800" fill="url(#paper-wash)"/><path d="M28 23Q650 7 1570 24M30 777Q780 790 1573 775" fill="none" stroke="#8b7044" stroke-opacity=".15" stroke-width="4"/>';
+  body+=svgText('抽签票',68,49,{size:34,color:ink,anchor:'start',weight:400});
+  body+=svgText(snapshot?.active?snapshot.swordName??'铁砧上的剑':'铁砧未放剑',1518,49,{size:25,color:'#826c49',anchor:'end',weight:400});
+  rows.forEach((row,index)=>{
+    const y=103+index*104;
+    body+=svgText(row.label,68,y+25,{size:40,color:ink,anchor:'start',weight:400});
+    body+=ticketRowGlyphs(row,{id:row.id,x:310,y,width:1050,height:50,size:26});
+    body+=svgText(row.total,1518,y+25,{size:32,color:ink,anchor:'end',weight:400});
+    if(row.mechanicAdded){
+      body+=svgText('机制',253,y+66,{size:18,color:'#6c7146',anchor:'start',weight:400});
+      body+=ticketRowGlyphs(row,{id:row.id,part:'mechanic',x:310,y:y+53,width:1050,height:28,size:20});
     }
   });
-  body+=svgText('一格一票 · 蓝色为机制加票 · 划销表示移除',800,621,{size:26,color:'#aaae99',weight:400});
-  const notes=active?(snapshot.temporary??[]).map(effect=>ticketEffectLabel(effect.label)).join(' · '):'将剑放到铁砧，查看该剑的加票、移票与下一锤效果';
-  // SVG wrapping is explicit to preserve Chinese spacing across browser fonts.
-  const lines=Array.from(notes.matchAll(/.{1,53}/gu),match=>match[0]);
-  lines.slice(0,4).forEach((line,index)=>{body+=svgText(line,800,660+index*26,{size:24,color:index===0?green:'#b0b4a1',weight:400});});
+  body+='<path d="M68 652Q800 657 1518 653" fill="none" stroke="#7a6442" stroke-width="2"/>';
+  body+=svgText(`共 ${total} 张`,68,693,{size:33,color:ink,anchor:'start',weight:400});
+  body+=svgText('强化风险体现在铁砧牌上',68,748,{size:25,color:'#8b7451',anchor:'start',weight:400});
   return body;
 }
 
@@ -36,15 +29,15 @@ function boardArt(snapshot){
 export function createTicketBoard({anisotropy=1}={}){
   const root=new THREE.Group();root.name='draw-ticket-board';
   const geometries=new Set(),materials=new Set();let disposed=false;
-  const wood=new THREE.MeshStandardMaterial({color:0x222920,roughness:.93}),frame=new THREE.MeshStandardMaterial({color:0x9b824e,metalness:.62,roughness:.45});materials.add(wood);materials.add(frame);
+  const paper=new THREE.MeshStandardMaterial({color:0xc3a977,roughness:1}),nail=new THREE.MeshStandardMaterial({color:0x514837,metalness:.7,roughness:.7});materials.add(paper);materials.add(nail);
   function box(width,height,depth,x,y,z,material){const geometry=new THREE.BoxGeometry(width,height,depth);geometries.add(geometry);const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);root.add(mesh);return mesh;}
-  box(3.8,1.9,.09,0,0,0,wood);
-  box(3.8,.055,.045,0,.9225,.055,frame);box(3.8,.055,.045,0,-.9225,.055,frame);
-  box(.055,1.79,.045,-1.8725,0,.055,frame);box(.055,1.79,.045,1.8725,0,.055,frame);
-  const panel=createVectorPanel({width:1600,height:765,resolution:3072,anisotropy});
+  box(3.8,1.9,.012,0,0,0,paper);
+  const nailGeometry=new THREE.SphereGeometry(.018,6,4);geometries.add(nailGeometry);
+  for(const x of [-1.73,1.73]){const mesh=new THREE.Mesh(nailGeometry,nail);mesh.position.set(x,.83,.026);mesh.scale.z=.4;root.add(mesh);}
+  const panel=createVectorPanel({width:1600,height:800,resolution:3072,anisotropy});
   const material=new THREE.MeshBasicMaterial({map:panel.texture,toneMapped:false});materials.add(material);
-  const geometry=new THREE.PlaneGeometry(3.64,1.740375);geometries.add(geometry);
-  const face=new THREE.Mesh(geometry,material);face.name='ticket-board-face';face.position.z=.06;root.add(face);
+  const geometry=new THREE.PlaneGeometry(3.8,1.9);geometries.add(geometry);
+  const face=new THREE.Mesh(geometry,material);face.name='ticket-board-face';face.position.z=.007;root.add(face);
   function update(snapshot){return disposed?Promise.resolve(false):panel.update(boardArt(snapshot));}
   update(null);
   function dispose(){if(disposed)return;disposed=true;panel.dispose();for(const geometry of geometries)geometry.dispose();for(const material of materials)material.dispose();geometries.clear();materials.clear();root.removeFromParent();root.clear();}
