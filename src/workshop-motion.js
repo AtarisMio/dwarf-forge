@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {HAMMER_HEAD,HAMMER_FACE,HAMMER_GRIP,hammerHeadMinimumY} from './hammer-frame.js';
 
 const ease = t => { const v=THREE.MathUtils.clamp(t,0,1);return v*v*(3-2*v); };
 function copyPose(pose) { return { parent:pose.parent, position:pose.position.clone(),quaternion:pose.quaternion.clone(),scale:pose.scale.clone() }; }
@@ -16,17 +17,34 @@ function blend(root, from, to, progress, arc=0) {
 
 export function getHammerStrikePose({ camera, restPosition, restQuaternion, scale, origin, time, contact=.22, duration=.48 }) {
   const rest=worldPose({parent:camera,position:restPosition,quaternion:restQuaternion,scale:new THREE.Vector3().setScalar(scale)});
-  const heading=new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ').y;
-  const contactQuaternion=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,heading,0));
-  const contactPosition=origin.clone().sub(new THREE.Vector3(-.064,.3383,0).multiplyScalar(scale).applyQuaternion(contactQuaternion));
-  const raised=rest.position.clone().add(new THREE.Vector3(0,.26,.055));
-  let position,quaternion;
-  if(time<.1){position=rest.position.clone().lerp(raised,ease(time/.1));quaternion=rest.quaternion.clone();}
-  else if(time<contact){const t=ease((time-.1)/(contact-.1));position=raised.clone().lerp(contactPosition,t);quaternion=rest.quaternion.clone().slerp(contactQuaternion,t);}
-  else if(time<contact+.04){position=contactPosition;quaternion=contactQuaternion;}
-  else {const t=ease((time-contact-.04)/(duration-contact-.04));position=contactPosition.clone().lerp(rest.position,t);quaternion=contactQuaternion.clone().slerp(rest.quaternion,t);}
+  const toPlayer=camera.getWorldPosition(new THREE.Vector3()).sub(origin);toPlayer.y=0;toPlayer.normalize();
+  const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));right.y=0;right.normalize();
+  const toGrip=toPlayer.clone().addScaledVector(right,.85).normalize();
+  const yaw=Math.atan2(-toGrip.z,toGrip.x),contactQuaternion=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),yaw)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2-HAMMER_HEAD.roll));
+  const contactPosition=origin.clone().sub(HAMMER_FACE.clone().multiplyScalar(scale).applyQuaternion(contactQuaternion));
+  const gripOffset=q=>HAMMER_GRIP.clone().multiplyScalar(scale).applyQuaternion(q);
+  const restWrist=rest.position.clone().add(gripOffset(rest.quaternion)),contactWrist=contactPosition.clone().add(gripOffset(contactQuaternion));
+  const raisedWrist=restWrist.clone().addScaledVector(toPlayer,.045);raisedWrist.y=Math.max(restWrist.y+.14,contactWrist.y+.1);
+  const raisedQuaternion=new THREE.Quaternion().setFromAxisAngle(right,1.05).multiply(contactQuaternion);
+  let wrist,quaternion,clearance=0;
+  if(time<.1){const t=ease(time/.1);wrist=restWrist.clone().lerp(raisedWrist,t);quaternion=rest.quaternion.clone().slerp(raisedQuaternion,t);}
+  else if(time<contact){const t=ease((time-.1)/(contact-.1));wrist=raisedWrist.clone().lerp(contactWrist,t);quaternion=raisedQuaternion.clone().slerp(contactQuaternion,t);clearance=.025*(1-t);}
+  else if(time<contact+.04){wrist=contactWrist;quaternion=contactQuaternion;}
+  else {const t=ease((time-contact-.04)/(duration-contact-.04));wrist=contactWrist.clone().lerp(restWrist,t);wrist.y+=Math.sin(Math.PI*t)*.22;quaternion=contactQuaternion.clone().slerp(rest.quaternion,t);clearance=Math.sin(Math.PI*t)*.08;}
+  const position=wrist.sub(gripOffset(quaternion));
+  // Lift the complete head envelope, not just a nominal contact point.
+  const head=position.clone().add(new THREE.Vector3(...HAMMER_HEAD.position).multiplyScalar(scale).applyQuaternion(quaternion));
+  const nearBlade=ease((.55-Math.hypot(head.x-origin.x,head.z-origin.z))/.2);
+  position.y+=nearBlade*Math.max(0,origin.y+clearance-position.y-hammerHeadMinimumY(quaternion,scale));
   camera.updateWorldMatrix(true,false);const matrix=new THREE.Matrix4().compose(position,quaternion,new THREE.Vector3().setScalar(scale)).premultiply(camera.matrixWorld.clone().invert());
   const result={position:new THREE.Vector3(),quaternion:new THREE.Quaternion(),scale:new THREE.Vector3()};matrix.decompose(result.position,result.quaternion,result.scale);return result;
+}
+
+export function getHammerForearmPose(wristPosition,aspect){
+  const x=THREE.MathUtils.lerp(.4,.62,THREE.MathUtils.clamp((aspect-.9)/.65,0,1)),elbow=new THREE.Vector3(x,-.93,-.48);
+  const axis=wristPosition.clone().sub(elbow),length=axis.length();
+  return {wrist:wristPosition.clone(),elbow,length,quaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),axis.normalize())};
 }
 
 export function getTicketFocusView(aspect, fov=66, sidePanel=false) {
@@ -79,7 +97,7 @@ export function createWorkshopMotion({ scene, furnacePose, onImpact=()=>{}, onTr
       state.entry.root.userData.localMaterials?.forEach(m=>{if(!m.userData.respondsToHeat)return;m.emissive.copy(m.userData.baseEmission||new THREE.Color(0)).lerp(new THREE.Color('#ff5217'),intensity*THREE.MathUtils.lerp(.92,.85,withdrawal));m.emissiveIntensity=Math.max(m.userData.heatIntensity??0,brightness);});
       if(t>=1)finishHeating(true);
     }
-    if(swing){const state=swing;state.time+=dt;if(!state.impacted&&state.time>=state.contact){state.impacted=true;onImpact({...state,position:state.position.clone()});}if(swing===state&&state.time>=state.duration)swing=null;}
+    if(swing){const state=swing;state.time+=dt;if(!state.impacted&&state.time>=state.contact){state.impacted=true;const corrected=onImpact({...state,position:state.position.clone()});if(swing===state&&corrected?.position)state.position.copy(corrected.position);}if(swing===state&&state.time>=state.duration)swing=null;}
   }
   function forget(id) { if(heating?.id===id)cancelHeating();transfers.delete(id);placements.delete(id); }
   function reset() { cancelHeating();for(const transfer of transfers.values())attach(transfer.root,transfer.target);transfers.clear();swing=null; }

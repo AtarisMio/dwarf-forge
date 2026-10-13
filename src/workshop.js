@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createMouseLook } from './mouse-look.js';
 import { createTouchMovement } from './touch-movement.js';
-import { createWorkshopMotion, getHammerStrikePose, getTicketFocusView, getHeldSwordPose } from './workshop-motion.js';
+import { createWorkshopMotion, getHammerStrikePose, getHammerForearmPose, getTicketFocusView, getHeldSwordPose } from './workshop-motion.js';
 import { createShadowAvatar } from './shadow-avatar.js';
 import { createTicketBoard } from './ticket-board.js';
 import { createSwordRenderer } from './sword-renderer.js';
 import { createSwordPhysics } from './sword-physics.js';
+import { findForgeContact } from './forge-contact.js';
+import { HAMMER_HEAD, HAMMER_WRIST } from './hammer-frame.js';
 import { createRelicShopRenderer } from './relic-shop-renderer.js';
 import { createVectorPanel, svgText } from './vector-panels.js';
 import { WORKSHOP_ART, ledgerArt, calendarArt } from './workshop-vector-art.js';
@@ -521,7 +523,7 @@ export function createWorkshop(container, callbacks = {}) {
   const hammer = new THREE.Group(); camera.add(hammer);
   const hammerHandle = lathe(hammer, wood, [[.043, 0], [.047, .035], [.04, .22], [.034, .54], [.038, .69], [.044, .78]], 24);
   hammerHandle.position.set(.035, -.39, 0); hammerHandle.rotation.z = -.12; hammerHandle.scale.z = .78;
-  const headAssembly = new THREE.Group(); headAssembly.position.set(-.058, .405, 0); headAssembly.rotation.z = -.12; headAssembly.scale.setScalar(.58); hammer.add(headAssembly);
+  const headAssembly = new THREE.Group(); headAssembly.position.fromArray(HAMMER_HEAD.position); headAssembly.rotation.z = HAMMER_HEAD.roll; headAssembly.scale.setScalar(HAMMER_HEAD.scale); hammer.add(headAssembly);
   bevelBox(headAssembly, iron, -.01, 0, 0, .36, .235, .245, .044);
   bevelBox(headAssembly, polishedIron, -.22, 0, 0, .13, .22, .232, .032);
   bevelBox(headAssembly, iron, .205, 0, 0, .15, .14, .175, .042);
@@ -545,10 +547,13 @@ export function createWorkshop(container, callbacks = {}) {
     const fingerMesh = new THREE.Mesh(geometry(new THREE.TubeGeometry(curl, 10, .021 - finger * .0015, 8, false)), glove); hammer.add(fingerMesh);
   }
   const thumb = sphere(hammer, glove, -.019, -.17, .071, .034, .074, .029); thumb.rotation.z = -.7;
-  const wrist = cylinder(hammer, glove, .069, .073, .16, .067, -.342, .065, 20); wrist.rotation.z = -.18;
+  const wristMarker = new THREE.Object3D(); wristMarker.position.copy(HAMMER_WRIST); hammer.add(wristMarker);
+  const forearmGroup = new THREE.Group(); camera.add(forearmGroup);
+  const wrist = cylinder(forearmGroup, glove, .069 * .68, .073 * .68, 1, 0, 0, 0, 20);
   const sleeve = material({ color: '#353b38', map: woodTexture, roughness: 1 });
-  const cuff = cylinder(hammer, sleeve, .082, .104, .27, .095, -.49, .071, 20); cuff.rotation.z = -.18;
-  cylinder(hammer, leather, .086, .087, .042, .071, -.371, .069, 20);
+  const cuff = cylinder(forearmGroup, sleeve, .082 * .68, .104 * .68, 1, 0, 0, 0, 20);
+  const wristBand = cylinder(forearmGroup, leather, .086 * .68, .087 * .68, 1, 0, 0, 0, 20);
+  const wristPosition = new THREE.Vector3();
   hammer.position.set(.56, -.47, -.82); hammer.rotation.set(.1, -.3, -.44); hammer.scale.setScalar(.68);
   const toolFill = new THREE.PointLight('#dcc6a3', 1.5, 2.3, 1.8); toolFill.position.set(-.15, .2, -.15); camera.add(toolFill);
 
@@ -677,12 +682,23 @@ export function createWorkshop(container, callbacks = {}) {
     if (disposed || paused || contextLost) return false;
     const kind = typeof outcome === 'string' ? outcome : (outcome?.type || outcome?.kind || outcome?.outcome || 'success');
     const anvilSword = physicalSwords.get(worldState?.anvilId)?.mesh;
-    const position = anvilSword ? anvilSword.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(.12, .06, 0)) : new THREE.Vector3(-.96, 1.64, -.92);
+    const surface = findForgeContact(anvilSword || swordGroup, { bladeMaterials: anvilSword ? null : [bladeMaterial, edgeMaterial, fullerMaterial] });
+    const position = surface?.position || wornFace.getWorldPosition(new THREE.Vector3());
     if (!motion.strike({ outcome: kind, evolved: !!outcome?.evolved, durationMs: outcome?.durationMs, position })) return false;
     if (anvilSword && outcome?.evolved) anvilSword.userData.flash = 0;
     strikeTime = elapsed; strikeKind = kind; return true;
   }
   function emitImpact(impact) {
+    const pendingSwing = motion.getStrike();
+    onStrikeImpact({ outcome: impact.outcome, evolved: impact.evolved, position: { x: impact.position.x, y: impact.position.y, z: impact.position.z } });
+    if (disposed || contextLost || motion.getStrike() !== pendingSwing) return { position: impact.position };
+    // The callback commits the new form. Keep break sparks at the old contact,
+    // but align surviving swords and the hammer with the new rendered surface.
+    const anvilSword = physicalSwords.get(worldState?.anvilId)?.mesh;
+    if (impact.outcome !== 'break') {
+      const surface = findForgeContact(anvilSword || (!worldState && swordState ? swordGroup : null), { bladeMaterials: anvilSword ? null : [bladeMaterial, edgeMaterial, fullerMaterial] });
+      if (surface) impact.position.copy(surface.position);
+    }
     impactThisFrame = true;
     strikeKind = impact.outcome;
     impactFlashLife = .08; impactFlare.position.copy(impact.position); impactFlare.position.y += .035; impactFlare.visible = true; impactMaterial.opacity = .92;
@@ -695,11 +711,10 @@ export function createWorkshop(container, callbacks = {}) {
       sparkVelocity[i * 3] = Math.cos(fan) * speed; sparkVelocity[i * 3 + 1] = 1.4 + random() * 3.7; sparkVelocity[i * 3 + 2] = Math.sin(fan) * speed * .7;
       sparkLife[i] = .28 + random() * .5; sparkColors[i * 3] = color.r; sparkColors[i * 3 + 1] = color.g; sparkColors[i * 3 + 2] = color.b;
     } sparkGeometry.attributes.position.needsUpdate = true; sparkGeometry.attributes.color.needsUpdate = true;
-    onStrikeImpact({ outcome: impact.outcome, evolved: impact.evolved, position: { x: impact.position.x, y: impact.position.y, z: impact.position.z } });
     // The host commits the new rendered form in the contact callback. Apply
     // the flash to those new instance materials, rather than the old blade.
-    const anvilSword = physicalSwords.get(worldState?.anvilId)?.mesh;
     if (anvilSword && impact.evolved) { anvilSword.userData.flash = .225; anvilSword.userData.localMaterials?.forEach(m => { m.emissiveIntensity = (m.userData.heatIntensity ?? m.userData.baseIntensity) + .22; }); }
+    return { position: impact.position };
   }
   function beginHeating(id, durationMs = 1400) { if (disposed || paused || contextLost) return Promise.resolve(false); return motion.beginHeating(id, durationMs); }
   function cancelHeating() { motion.cancelHeating(); }
@@ -854,15 +869,29 @@ export function createWorkshop(container, callbacks = {}) {
     }
     swordPhysics.update(dt, physicalSwords);
     swordRenderer.animate(dt);
-    motion.update(dt);
     const t = elapsed - strikeTime;
+    swordGroup.position.y = 1.58 + (t > .22 && t < .46 ? Math.sin((t - .22) * 47) * .012 * Math.exp(-(t - .22) * 14) : 0);
+    if (worldState?.anvilId && !motion.isTransferring(worldState.anvilId)) { const anvilSword = physicalSwords.get(worldState.anvilId); if (anvilSword) anvilSword.mesh.position.y = swordGroup.position.y; }
+    motion.update(dt);
     hammer.visible = !guideView && (focused === 'anvil' || (!focused && !worldState?.carriedId));
     const toolX = THREE.MathUtils.lerp(.2, .43, THREE.MathUtils.clamp((camera.aspect - .9) / .65, 0, 1));
     hammer.position.set(toolX, -.43, -.99); hammer.rotation.set(.1, -.3, -.44);
     const swing = motion.getStrike();
-    if (swing) { const pose = getHammerStrikePose({ camera, restPosition: hammer.position, restQuaternion: hammer.quaternion, scale: .68, origin: swing.position, time: swing.time, duration: swing.duration }); hammer.position.copy(pose.position); hammer.quaternion.copy(pose.quaternion); }
-    swordGroup.position.y = 1.58 + (t > .22 && t < .46 ? Math.sin((t - .22) * 47) * .012 * Math.exp(-(t - .22) * 14) : 0);
-    if (worldState?.anvilId && !motion.isTransferring(worldState.anvilId)) { const anvilSword = physicalSwords.get(worldState.anvilId); if (anvilSword) anvilSword.mesh.position.y = swordGroup.position.y; }
+    if (swing && swing.outcome !== 'break' && swing.time >= swing.contact && swing.time < swing.contact + .04) {
+      const anvilSword = physicalSwords.get(worldState?.anvilId)?.mesh;
+      const surface = findForgeContact(anvilSword || (!worldState && swordState ? swordGroup : null), { bladeMaterials: anvilSword ? null : [bladeMaterial, edgeMaterial, fullerMaterial] });
+      if (surface) swing.position.copy(surface.position);
+    }
+    if (swing) { const pose = getHammerStrikePose({ camera, restPosition: hammer.position, restQuaternion: hammer.quaternion, scale: .68, origin: swing.position, time: swing.time, contact: swing.contact, duration: swing.duration }); hammer.position.copy(pose.position); hammer.quaternion.copy(pose.quaternion); }
+    forearmGroup.visible = hammer.visible;
+    if (forearmGroup.visible) {
+      hammer.updateWorldMatrix(true, true); wristMarker.getWorldPosition(wristPosition); camera.worldToLocal(wristPosition);
+      const forearm = getHammerForearmPose(wristPosition, camera.aspect), gloveLength = Math.min(.11, forearm.length), sleeveLength = Math.max(.001, forearm.length - gloveLength);
+      forearmGroup.position.copy(forearm.wrist); forearmGroup.quaternion.copy(forearm.quaternion);
+      wrist.position.y = -gloveLength / 2; wrist.scale.y = gloveLength;
+      cuff.position.y = -gloveLength - sleeveLength / 2; cuff.scale.y = sleeveLength;
+      wristBand.position.y = -gloveLength; wristBand.scale.y = .042 * .68;
+    }
     avatar.update({ camera, heldRoot: physicalSwords.get(worldState?.carriedId)?.mesh, hammerRoot: hammer, time: elapsed, walking });
     bodyLight.position.set(THREE.MathUtils.clamp(camera.position.x + (camera.position.x > 0 ? 1.7 : -1.7), -5.5, 5.5), 3.7, THREE.MathUtils.clamp(camera.position.z + (camera.position.z > .5 ? 1.7 : -1.7), -3.45, 4.99)); bodyLight.target.position.set(camera.position.x, .65, camera.position.z);
     fireLight.intensity = 27 + Math.sin(elapsed * 7.6) * 3 + Math.sin(elapsed * 15.7) * 1.5;

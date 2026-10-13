@@ -10,6 +10,10 @@
 
 ![Dwarf Forge 桌面工坊与主菜单](docs/screenshots/workshop.jpg)
 
+挥锤锻造：锤头端面落在剑刃上，手腕和前臂随动作抬起、接触与回收；进化时落点跟随新的剑形态。
+
+![锤头击中热剑，前臂从手腕延伸至画面右下方](docs/screenshots/hammer-strike.jpg)
+
 手工裁切的羊皮票数看板：不规则皮边、细纤维与斑驳折痕。基础票用空心方格，遗物加票用绿色「＋」，移除票在原方格上打叉；机制加票在对应结果下方单独显示。
 
 ![手工羊皮票数看板，不规则粗糙皮边与绿色加票](docs/screenshots/ticket-board.jpg)
