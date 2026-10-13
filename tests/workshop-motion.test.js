@@ -2,9 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { createWorkshopMotion, getHammerReadyPose, getHammerStrikePose, getHammerForearmPose, getTicketFocusView, getHeldSwordPose } from '../src/workshop-motion.js';
+import { createWorkshopMotion, getHammerReadyPose, getHammerStrikePose, getHammerForearmPose, getAnvilFocusView, getTicketFocusView, getHeldSwordPose } from '../src/workshop-motion.js';
 import {HAMMER_HEAD,HAMMER_FACE,HAMMER_WRIST} from '../src/hammer-frame.js';
 const pose = (parent, x, y=0, z=0) => ({ parent, position:new THREE.Vector3(x,y,z), quaternion:new THREE.Quaternion(), scale:new THREE.Vector3(1,1,1) });
+const forgeCamera = aspect => {
+  const view=getAnvilFocusView(aspect),camera=new THREE.PerspectiveCamera(66,aspect,.045,60);
+  camera.position.copy(view.position);camera.lookAt(view.look);camera.updateMatrixWorld();return camera;
+};
+const strikeTiming=[{contact:.32,duration:.56},{contact:(640/1.45/1000*.92)*.58,duration:640/1.45/1000*.92}];
 
 test('transfer preserves root and starts at its old world pose, repeated sync does not restart it', () => {
   const scene=new THREE.Scene(), camera=new THREE.Group();scene.add(camera);camera.position.set(2,1,0);
@@ -39,7 +44,7 @@ test('furnace inserts, glows progressively, pauses and returns before resolving'
 test('hammer striking face reaches the spark origin at contact for tilted portrait cameras', () => {
   const camera=new THREE.PerspectiveCamera();camera.position.set(-1,2.2,3);camera.lookAt(-1,1.5,-2);
   const origin=new THREE.Vector3(-.96,1.64,-.92),hammer=new THREE.Group();camera.add(hammer);
-  const contact=getHammerStrikePose({camera,restPosition:new THREE.Vector3(.2,-.43,-.99),restQuaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,-.3,-.44)),scale:.68,origin,time:.22});
+  const contact=getHammerStrikePose({camera,scale:.68,origin,time:.32});
   hammer.position.copy(contact.position);hammer.quaternion.copy(contact.quaternion);hammer.scale.copy(contact.scale);hammer.updateWorldMatrix(true,false);
   const strikingFace=HAMMER_FACE.clone().applyMatrix4(hammer.matrixWorld);
   assert.ok(strikingFace.distanceTo(origin)<1e-6,'contact and spark source are the same world point');
@@ -47,7 +52,7 @@ test('hammer striking face reaches the spark origin at contact for tilted portra
 test('the actual left hammer face points down at contact and the gripped hand stays above the anvil', () => {
   const camera=new THREE.PerspectiveCamera();camera.position.set(-1.05,2.22,.95);camera.lookAt(-1.05,1.51,-2.1);
   const origin=new THREE.Vector3(-.96,1.62,-.92),hammer=new THREE.Group();camera.add(hammer);
-  const pose=getHammerStrikePose({camera,restPosition:new THREE.Vector3(.43,-.43,-.99),restQuaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,-.3,-.44)),scale:.68,origin,time:.22});
+  const pose=getHammerStrikePose({camera,scale:.68,origin,time:.32});
   hammer.position.copy(pose.position);hammer.quaternion.copy(pose.quaternion);hammer.scale.copy(pose.scale);hammer.updateWorldMatrix(true,false);
   // Left polished cap from the rendered head assembly, not the head underside.
   const headRotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-.12);
@@ -59,9 +64,9 @@ test('the actual left hammer face points down at contact and the gripped hand st
   assert.ok(grip.y>origin.y+.18,'hand and handle do not disappear into the anvil');
 });
 test('thin and thick swords start and finish at the same forging ready pose without a jump',()=>{
-  const camera=new THREE.PerspectiveCamera();camera.position.set(-1.05,2.22,.95);camera.lookAt(-1.05,1.51,-2.1);
-  for(const y of [1.61,1.75])for(const time of [0,.48]){
-    const options={camera,scale:.68,origin:new THREE.Vector3(-.96,y,-.92)},ready=getHammerReadyPose(options),pose=getHammerStrikePose({...options,time});
+  const camera=forgeCamera(1280/720);
+  for(const y of [1.61,1.75])for(const timing of strikeTiming)for(const time of [0,timing.duration]){
+    const options={camera,scale:.68,origin:new THREE.Vector3(-.96,y,-.92)},ready=getHammerReadyPose(options),pose=getHammerStrikePose({...options,...timing,time});
     assert.ok(pose.position.distanceTo(ready.position)<1e-7,'swing starts and finishes at the current blade working pose');assert.ok(pose.quaternion.angleTo(ready.quaternion)<1e-7);
   }
 });
@@ -73,10 +78,10 @@ test('rounded hammer head and gripping hand stay clear of the anvil throughout d
     {g:new RoundedBoxGeometry(.125,.185,.085,3,.034),p:new THREE.Vector3(.055,-.205,.067),roll:-.13}
   ];
   const point=new THREE.Vector3();
-  for(const [z,toolX] of [[.95,.43],[3.3,.2],[4.18,.2]])for(const y of [1.61,1.75]){
-    const camera=new THREE.PerspectiveCamera();camera.position.set(-1.05,2.22,z);camera.lookAt(-1.05,1.51,-2.1);camera.updateMatrixWorld();
-    for(let frame=0;frame<=48;frame++){
-      const t=frame/100,pose=getHammerStrikePose({camera,restPosition:new THREE.Vector3(toolX,-.43,-.99),restQuaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,-.3,-.44)),scale:.68,origin:new THREE.Vector3(-.96,y,-.92),time:t});
+  for(const aspect of [1280/720,1,360/800])for(const y of [1.61,1.75])for(const timing of strikeTiming){
+    const camera=forgeCamera(aspect);
+    for(let frame=0;frame<=56;frame++){
+      const t=frame/56*timing.duration,pose=getHammerStrikePose({camera,scale:.68,origin:new THREE.Vector3(-.96,y,-.92),...timing,time:t});
       const root=new THREE.Matrix4().compose(pose.position,pose.quaternion,pose.scale).premultiply(camera.matrixWorld);
       for(const {g,p,head,roll=0} of parts){
         const local=new THREE.Matrix4().compose(p,new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),roll),new THREE.Vector3(1,1,1));
@@ -84,7 +89,7 @@ test('rounded hammer head and gripping hand stay clear of the anvil throughout d
         for(let i=0;i<positions.count;i++){
           point.fromBufferAttribute(positions,i).applyMatrix4(matrix);
           if(point.x> -1.575&&point.x<-.355&&point.z> -1.1875&&point.z<-.6525)
-            assert.ok(point.y>=1.508-1e-6,`solid anvil clearance at t=${t} camera=${z} blade=${y}`);
+            assert.ok(point.y>=1.508-1e-6,`solid anvil clearance at t=${t} aspect=${aspect} blade=${y}`);
           if(head&&point.x> -1.575&&point.x<-.355&&Math.abs(point.z+.92)<.11)
             assert.ok(point.y>=y-1e-6,`head does not pass through the blade at t=${t}`);
         }
@@ -95,10 +100,10 @@ test('rounded hammer head and gripping hand stay clear of the anvil throughout d
 });
 test('articulated forearm and upper arm connect at the elbow and clear the anvil while the shoulder stays offscreen',()=>{
   const sleeve=new THREE.CylinderGeometry(.104,.13,1,20),point=new THREE.Vector3();
-  for(const [aspect,toolX,z] of [[1280/720,.43,.95],[360/800,.2,4.18]]){
-    const camera=new THREE.PerspectiveCamera(66,aspect,.045,60);camera.position.set(-1.05,2.22,z);camera.lookAt(-1.05,1.51,-2.1);camera.updateMatrixWorld();
-    for(let frame=0;frame<=48;frame++){
-      const pose=getHammerStrikePose({camera,restPosition:new THREE.Vector3(toolX,-.43,-.99),restQuaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,-.3,-.44)),scale:.68,origin:new THREE.Vector3(-.96,1.75,-.92),time:frame/100});
+  for(const aspect of [1280/720,1,360/800])for(const y of [1.61,1.75])for(const timing of strikeTiming){
+    const camera=forgeCamera(aspect);
+    for(let frame=0;frame<=56;frame++){
+      const pose=getHammerStrikePose({camera,scale:.68,origin:new THREE.Vector3(-.96,y,-.92),...timing,time:frame/56*timing.duration});
       const wrist=HAMMER_WRIST.clone().applyMatrix4(new THREE.Matrix4().compose(pose.position,pose.quaternion,pose.scale)),arm=getHammerForearmPose(wrist,aspect,pose.armScale);
       assert.ok(Math.abs(arm.wrist.distanceTo(arm.elbow)-arm.length)<1e-6,'forearm maintains its physical length');
       assert.ok(Math.abs(arm.shoulder.distanceTo(arm.elbow)-arm.upperLength)<1e-6,'upper arm maintains its physical length');
@@ -127,7 +132,8 @@ test('strike emits one impact at contact, never at start or while paused, and re
   assert.equal(motion.strike({outcome:'great',evolved:true,position:new THREE.Vector3(1,2,3)}),true);
   assert.equal(motion.strike({outcome:'success'}),false);assert.equal(impacts.length,0);
   motion.update(.1);motion.update(0);assert.equal(impacts.length,0);
-  motion.update(.13);assert.equal(impacts.length,1);assert.equal(impacts[0].outcome,'great');assert.deepEqual(impacts[0].position.toArray(),[1,2,3]);
+  motion.update(motion.getStrike().contact-.101);assert.equal(impacts.length,0,'no outcome before actual surface contact');
+  motion.update(.002);assert.equal(impacts.length,1);assert.equal(impacts[0].outcome,'great');assert.deepEqual(impacts[0].position.toArray(),[1,2,3]);
   motion.update(.5);assert.equal(impacts.length,1);assert.equal(motion.isInteracting(),false);
   motion.strike({outcome:'break'});motion.reset();motion.update(1);assert.equal(impacts.length,1);motion.dispose();
 });
@@ -135,12 +141,12 @@ test('strike emits one impact at contact, never at start or while paused, and re
 test('an impact callback may reset the current run without a stale pending strike', () => {
   const scene=new THREE.Scene();let motion;
   motion=createWorkshopMotion({scene,onImpact:()=>motion.reset()});
-  motion.strike({outcome:'success'});assert.doesNotThrow(()=>motion.update(.25));assert.equal(motion.isInteracting(),false);motion.dispose();
+  motion.strike({outcome:'success'});assert.doesNotThrow(()=>motion.update(motion.getStrike().contact));assert.equal(motion.isInteracting(),false);motion.dispose();
 });
 test('an impact-time form change corrects the active hammer contact before its pose is rendered',()=>{
   const scene=new THREE.Scene(),newSurface=new THREE.Vector3(-.96,1.75,-.92);let impacts=0;
   const motion=createWorkshopMotion({scene,onImpact:()=>{impacts++;return {position:newSurface};}});
-  motion.strike({outcome:'great',evolved:true,position:new THREE.Vector3(-.96,1.61,-.92)});motion.update(.22);
+  motion.strike({outcome:'great',evolved:true,position:new THREE.Vector3(-.96,1.61,-.92)});motion.update(motion.getStrike().contact);
   assert.equal(impacts,1);assert.ok(motion.getStrike().position.distanceTo(newSurface)<1e-8,'new blade surface replaces stale thin-blade contact');
   motion.update(0);assert.equal(impacts,1);motion.dispose();
 });
@@ -173,7 +179,7 @@ test('fastest grip and bellows cadence is never delayed by the cosmetic busy gat
   const scene=new THREE.Scene(),impacts=[];const motion=createWorkshopMotion({scene,onImpact:event=>impacts.push(event)});
   const durationMs=640/1.45;
   motion.strike({outcome:'success',durationMs});assert.ok(motion.getStrike().duration<durationMs/1000);
-  motion.update(.22);assert.equal(impacts.length,1);motion.update(.19);
+  const {contact,duration}=motion.getStrike();motion.update(contact);assert.equal(impacts.length,1);motion.update(duration-contact+.001);
   assert.equal(motion.isInteracting(),false,'visual finishes before the .441s gameplay cadence');
   assert.equal(motion.strike({outcome:'success',durationMs}),true);motion.dispose();
 });

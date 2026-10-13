@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createMouseLook } from './mouse-look.js';
 import { createTouchMovement } from './touch-movement.js';
-import { createWorkshopMotion, getHammerReadyPose, getHammerStrikePose, getHammerForearmPose, getTicketFocusView, getHeldSwordPose } from './workshop-motion.js';
+import { createWorkshopMotion, getHammerReadyPose, getHammerStrikePose, getHammerForearmPose, getAnvilFocusView, getTicketFocusView, getHeldSwordPose } from './workshop-motion.js';
 import { createShadowAvatar } from './shadow-avatar.js';
 import { createTicketBoard } from './ticket-board.js';
 import { createSwordRenderer } from './sword-renderer.js';
@@ -72,7 +72,7 @@ export function createWorkshop(container, callbacks = {}) {
   const physicalSwords = new Map(), swordTargets = [], merchantModels = [];
   let floorSwords = [], walking = false;
   let impactThisFrame = false;
-  let elapsed = 0, strikeTime = -100, strikeKind = '', lastTime = performance.now(), frame;
+  let elapsed = 0, strikeTime = -100, strikeContact = 0, strikeKind = '', lastTime = performance.now(), frame;
   let yaw = camera.rotation.y, pitch = camera.rotation.x;
   const keys = new Set();
   const raycaster = new THREE.Raycaster();
@@ -690,7 +690,7 @@ export function createWorkshop(container, callbacks = {}) {
     const position = surface?.position || wornFace.getWorldPosition(new THREE.Vector3());
     if (!motion.strike({ outcome: kind, evolved: !!outcome?.evolved, durationMs: outcome?.durationMs, position })) return false;
     if (anvilSword && outcome?.evolved) anvilSword.userData.flash = 0;
-    strikeTime = elapsed; strikeKind = kind; return true;
+    strikeTime = elapsed; strikeContact = motion.getStrike().contact; strikeKind = kind; return true;
   }
   function emitImpact(impact) {
     const pendingSwing = motion.getStrike();
@@ -762,10 +762,10 @@ export function createWorkshop(container, callbacks = {}) {
   function refreshFocusView() {
     if (!focused) return;
     focusPosition.fromArray(stationViews[focused].position);
-    // Preserve the readable board at desktop sizes, but give the near-field
-    // sword breathing room when the Codex side panel is square or portrait.
-    if (focused === 'anvil') focusPosition.z += THREE.MathUtils.clamp(1.32 / camera.aspect - 1, 0, 1.7) * 1.9;
     const target = new THREE.Vector3(...stationViews[focused].look);
+    if (focused === 'anvil') {
+      const view = getAnvilFocusView(camera.aspect); focusPosition.copy(view.position); target.copy(view.look);
+    }
     if (focused === 'tickets') {
       const view = getTicketFocusView(camera.aspect, camera.fov); focusPosition.copy(view.position); target.copy(view.look);
     }
@@ -873,8 +873,8 @@ export function createWorkshop(container, callbacks = {}) {
     }
     swordPhysics.update(dt, physicalSwords);
     swordRenderer.animate(dt);
-    const t = elapsed - strikeTime;
-    swordGroup.position.y = 1.58 + (t > .22 && t < .46 ? Math.sin((t - .22) * 47) * .012 * Math.exp(-(t - .22) * 14) : 0);
+    const contactAge = elapsed - strikeTime - strikeContact;
+    swordGroup.position.y = 1.58 + (contactAge >= 0 && contactAge <= .24 ? Math.sin(contactAge * 47) * .012 * Math.exp(-contactAge * 14) : 0);
     if (worldState?.anvilId && !motion.isTransferring(worldState.anvilId)) { const anvilSword = physicalSwords.get(worldState.anvilId); if (anvilSword) anvilSword.mesh.position.y = swordGroup.position.y; }
     motion.update(dt);
     hammer.visible = !guideView && (focused === 'anvil' || (!focused && !worldState?.carriedId));
@@ -889,7 +889,7 @@ export function createWorkshop(container, callbacks = {}) {
     const forgeMode = focused === 'anvil';
     hammerReadyBlend = forgeMode ? Math.min(1, hammerReadyBlend + dt / .18) : 0;
     if (!forgeMode) readyContact = null;
-    let armScale = 1;
+    const armScale = 1;
     if (swing || forgeMode) {
       const anvilSword = physicalSwords.get(worldState?.anvilId)?.mesh;
       let readyPosition;
@@ -906,8 +906,6 @@ export function createWorkshop(container, callbacks = {}) {
       const pose = swing ? getHammerStrikePose({ camera, scale: .68, origin, time: swing.time, contact: swing.contact, duration: swing.duration }) : getHammerReadyPose({ camera, scale: .68, origin });
       const entryBlend = forgeMode ? hammerReadyBlend : 1;
       hammer.position.lerp(pose.position, entryBlend); hammer.quaternion.slerp(pose.quaternion, entryBlend);
-      armScale = pose.armScale ?? 1;
-      if (swing) { swing.armScale ??= armScale; armScale = swing.armScale; }
     }
     forearmGroup.visible = upperArmGroup.visible = hammer.visible;
     if (forearmGroup.visible) {

@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {getHammerStrikePose,getHammerForearmPose} from '../src/workshop-motion.js';
+import {getHammerStrikePose,getHammerForearmPose,getAnvilFocusView} from '../src/workshop-motion.js';
 import {HAMMER_FACE,HAMMER_WRIST} from '../src/hammer-frame.js';
 
-function setup(aspect=1280/720,z=.95){
-  const camera=new THREE.PerspectiveCamera(66,aspect,.045,60);camera.position.set(-1.05,2.22,z);camera.lookAt(-1.05,1.51,-2.1);camera.updateMatrixWorld();
+function setup(aspect=1280/720,z=null){
+  const view=getAnvilFocusView(aspect),camera=new THREE.PerspectiveCamera(66,aspect,.045,60);camera.position.copy(view.position);if(z!==null)camera.position.z=z;camera.lookAt(view.look);camera.updateMatrixWorld();
   const origin=new THREE.Vector3(-.96,1.62,-.92);
   const frame=time=>{
-    const pose=getHammerStrikePose({camera,restPosition:new THREE.Vector3(.43,-.43,-.99),restQuaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,-.3,-.44)),scale:.68,origin,time});
+    const pose=getHammerStrikePose({camera,scale:.68,origin,time,contact:.32,duration:.56});
     const local=new THREE.Matrix4().compose(pose.position,pose.quaternion,pose.scale);
     const wrist=HAMMER_WRIST.clone().applyMatrix4(local),face=HAMMER_FACE.clone().applyMatrix4(local).applyMatrix4(camera.matrixWorld);
     return {pose,wrist,face,arm:getHammerForearmPose(wrist,aspect,pose.armScale)};
@@ -23,20 +23,44 @@ test('forging forearm keeps its length instead of stretching as the hand reaches
   }
 });
 
+test('arm proportions stay within a normal reach and are never lengthened for a distant phone camera',()=>{
+  for(const [aspect,z] of [[1280/720,.95],[360/800,4.18]]){
+    const {frame}=setup(aspect,z),current=frame(.32);
+    assert.ok(current.arm.length<=.4,'forearm is at most 40cm, rather than a 72cm or longer sleeve');
+    assert.ok(current.arm.upperLength<=.42,'upper arm is at most 42cm');
+    assert.equal(current.pose.armScale,1,'camera framing cannot scale the limbs');
+  }
+});
+
+test('a forceful strike is lifted overhead before its accelerating downstroke',()=>{
+  const {frame,origin}=setup();
+  const raised=Math.max(...Array.from({length:32},(_,i)=>frame(i/100).face.y));
+  assert.ok(raised>origin.y+.7,'hammer is visibly raised high above the blade');
+});
+
 test('a strike accelerates into the blade and rebounds without parking on its surface',()=>{
   const {frame,origin}=setup();
-  assert.ok(frame(.22).face.distanceTo(frame(.219).face)>.001,'last millisecond still has downward impact speed');
-  assert.ok(frame(.244).face.y>origin.y+.012,'the hammer has already lifted 24ms after contact');
-  const liftHeight=Math.max(...Array.from({length:22},(_,i)=>frame(i/100).face.y))-origin.y;
-  const reboundHeight=Math.max(...Array.from({length:26},(_,i)=>frame(.22+i/100).face.y))-origin.y;
+  const earlySpeed=(frame(.15).face.y-frame(.151).face.y)/.001,lateSpeed=(frame(.31).face.y-frame(.311).face.y)/.001;
+  assert.ok(earlySpeed>0&&lateSpeed>earlySpeed*4,'measured downward speed increases strongly after the overhead windup');
+  assert.ok(frame(.32).face.distanceTo(frame(.319).face)>.001,'last millisecond still has downward impact speed');
+  assert.ok(frame(.344).face.y>origin.y+.012,'the hammer has already lifted 24ms after contact');
+  const liftHeight=Math.max(...Array.from({length:32},(_,i)=>frame(i/100).face.y))-origin.y;
+  const reboundHeight=Math.max(...Array.from({length:24},(_,i)=>frame(.32+i/100).face.y))-origin.y;
   assert.ok(reboundHeight<liftHeight*.65,'rebound is a smaller motion than the intentional windup');
 });
 
-test('forging stays in the working reach with no large idle-to-contact twist',()=>{
-  const {frame}=setup(),contact=frame(.22);
-  for(let i=0;i<=48;i++){
+test('overhead forging stays in reach without the old idle-to-contact side twist',()=>{
+  const {frame}=setup(),contact=frame(.32);
+  for(let i=0;i<=56;i++){
     const current=frame(i/100);
-    assert.ok(current.wrist.distanceTo(contact.wrist)<.19,'hand moves locally rather than lunging out of the lower right corner');
-    assert.ok(current.pose.quaternion.angleTo(contact.pose.quaternion)<1.2,'hammer swings through a compact stroke instead of rotating 120 degrees');
+    assert.ok(current.wrist.distanceTo(contact.wrist)<.35,'raised hand stays within a short working reach');
+    assert.ok(current.pose.quaternion.angleTo(contact.pose.quaternion)<1.75,'large overhead arc avoids the old 120 degree side twist');
+  }
+});
+
+test('desktop and portrait forge cameras keep the entire overhead stroke within the fixed shoulder reach',()=>{
+  for(const aspect of [1280/720,1,360/800]){
+    const {frame}=setup(aspect),anchor=new THREE.Vector3(THREE.MathUtils.lerp(.21,.28,THREE.MathUtils.clamp((aspect-.9)/.65,0,1)),-.3,-.12);
+    for(let i=0;i<=56;i++)assert.ok(frame(i/100).arm.shoulder.distanceTo(anchor)<1e-5,'IK never relocates the shoulder to manufacture extra reach');
   }
 });

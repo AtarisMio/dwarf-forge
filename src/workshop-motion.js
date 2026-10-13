@@ -23,8 +23,7 @@ function hammerContactFrame(camera,origin,scale){
     .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2-HAMMER_HEAD.roll));
   const contactPosition=origin.clone().sub(HAMMER_FACE.clone().multiplyScalar(scale).applyQuaternion(contactQuaternion));
   const contactWrist=contactPosition.clone().add(HAMMER_GRIP.clone().multiplyScalar(scale).applyQuaternion(contactQuaternion));
-  const armScale=Math.max(.75,Math.hypot(camera.position.x-origin.x,camera.position.z-origin.z)/1.87);
-  return {toGrip,contactQuaternion,contactWrist,armScale};
+  return {toGrip,contactQuaternion,contactWrist,armScale:1};
 }
 
 function hammerWorkingPose({camera,scale,origin},angle,reach,lift){
@@ -40,29 +39,29 @@ function hammerWorkingPose({camera,scale,origin},angle,reach,lift){
   const result={position:new THREE.Vector3(),quaternion:new THREE.Quaternion(),scale:new THREE.Vector3(),armScale:frame.armScale};matrix.decompose(result.position,result.quaternion,result.scale);return result;
 }
 
-export function getHammerReadyPose(options){return hammerWorkingPose(options,.3,.025,.025);}
+export function getHammerReadyPose(options){return hammerWorkingPose(options,.45,.03,.03);}
 
-export function getHammerStrikePose({camera,scale,origin,time,contact=.22,duration=.48}){
+export function getHammerStrikePose({camera,scale,origin,time,contact=.32,duration=.56}){
   const options={camera,scale,origin};let angle,reach,lift;
-  const raise=contact*.38;
-  if(time<raise){const t=ease(time/raise);angle=.3+.6*t;reach=.025+.02*t;lift=.025+.035*t;}
+  const raise=contact*.42;
+  if(time<raise){const t=ease(time/raise);angle=.45+1.05*t;reach=.03+.12*t;lift=.03+.21*t;}
   else if(time<contact){
     // Acceleration into contact, rather than a smoothstep that stops before impact.
-    const t=THREE.MathUtils.clamp((time-raise)/(contact-raise),0,1),remaining=1-t*t;
-    angle=.9*remaining;reach=.045*remaining;lift=.06*remaining;
+    const t=THREE.MathUtils.clamp((time-raise)/(contact-raise),0,1),remaining=1-Math.pow(t,1.8);
+    angle=1.5*remaining;reach=.15*remaining;lift=.24*remaining;
   }else{
     const rebound=Math.min(.09,(duration-contact)*.4);
-    if(time<contact+rebound){const t=THREE.MathUtils.clamp((time-contact)/rebound,0,1),up=1-(1-t)*(1-t);angle=.38*up;reach=.03*up;lift=.03*up;}
-    else {const t=ease((time-contact-rebound)/(duration-contact-rebound));angle=.38-.08*t;reach=.03-.005*t;lift=.03-.005*t;}
+    if(time<contact+rebound){const t=THREE.MathUtils.clamp((time-contact)/rebound,0,1),up=1-(1-t)*(1-t);angle=.55*up;reach=.04*up;lift=.04*up;}
+    else {const t=ease((time-contact-rebound)/(duration-contact-rebound));angle=.55-.1*t;reach=.04-.01*t;lift=.04-.01*t;}
   }
   return hammerWorkingPose(options,angle,reach,lift);
 }
 
-export function getHammerForearmPose(wristPosition,aspect,armScale=1){
-  // Perspective pullback changes view-model calibration, never a bone's length
-  // during a stroke. The elbow bends; the sleeve does not telescope.
-  const x=THREE.MathUtils.lerp(.4,.7,THREE.MathUtils.clamp((aspect-.9)/.65,0,1));
-  const shoulder=new THREE.Vector3(x,-1.05,-.46).multiplyScalar(armScale),length=.72*armScale,upperLength=.82*armScale;
+export function getHammerForearmPose(wristPosition,aspect){
+  // Keep anatomical proportions independent of framing. The forge camera moves
+  // into reach; limbs are never scaled to bridge an arbitrary camera distance.
+  const x=THREE.MathUtils.lerp(.21,.28,THREE.MathUtils.clamp((aspect-.9)/.65,0,1));
+  const shoulder=new THREE.Vector3(x,-.3,-.12),length=.34,upperLength=.38;
   const delta=wristPosition.clone().sub(shoulder),distance=delta.length(),axis=delta.clone().normalize();
   const reach=THREE.MathUtils.clamp(distance,Math.abs(upperLength-length)+1e-5,upperLength+length-1e-5);
   if(distance!==reach)shoulder.addScaledVector(axis,distance-reach);
@@ -72,6 +71,12 @@ export function getHammerForearmPose(wristPosition,aspect,armScale=1){
   const forearmAxis=wristPosition.clone().sub(elbow).normalize(),upperAxis=elbow.clone().sub(shoulder).normalize(),up=new THREE.Vector3(0,1,0);
   return {wrist:wristPosition.clone(),elbow,shoulder,length,upperLength,
     quaternion:new THREE.Quaternion().setFromUnitVectors(up,forearmAxis),upperQuaternion:new THREE.Quaternion().setFromUnitVectors(up,upperAxis)};
+}
+
+export function getAnvilFocusView(aspect){
+  const wide=THREE.MathUtils.clamp((aspect-.6)/.7,0,1);
+  return {position:new THREE.Vector3(THREE.MathUtils.lerp(-.12,-1.05,wide),1.92,THREE.MathUtils.lerp(-.7,-.1,wide)),
+    look:new THREE.Vector3(THREE.MathUtils.lerp(-1.1,-1,wide),THREE.MathUtils.lerp(1.63,1.64,wide),THREE.MathUtils.lerp(-.96,-1.3,wide))};
 }
 
 export function getTicketFocusView(aspect, fov=66, sidePanel=false) {
@@ -109,8 +114,8 @@ export function createWorkshopMotion({ scene, furnacePose, onImpact=()=>{}, onTr
   function strike(payload) {
     if(disposed||heating||swing||transfers.size)return false;
     const cadence=Number(payload.durationMs);
-    const duration=Number.isFinite(cadence)&&cadence>0?Math.max(.28,Math.min(.48,cadence/1000*.92)):.48;
-    swing={...payload,position:payload.position?.clone()||new THREE.Vector3(),time:0,duration,contact:.22,impacted:false};return true;
+    const duration=Number.isFinite(cadence)&&cadence>0?Math.max(.28,Math.min(.56,cadence/1000*.92)):.56;
+    swing={...payload,position:payload.position?.clone()||new THREE.Vector3(),time:0,duration,contact:Math.min(.32,duration*.58),impacted:false};return true;
   }
   function update(dt) {
     if(disposed||!(dt>0))return;
