@@ -46,8 +46,9 @@ export function getHammerStrikePose({camera,scale,origin,time,contact=.32,durati
   const raise=contact*.42;
   if(time<raise){const t=ease(time/raise);angle=.45+1.05*t;reach=.03+.12*t;lift=.03+.21*t;}
   else if(time<contact){
-    // Acceleration into contact, rather than a smoothstep that stops before impact.
-    const t=THREE.MathUtils.clamp((time-raise)/(contact-raise),0,1),remaining=1-Math.pow(t,1.8);
+    // Load the descent toward the end: a heavy start followed by a fast drive
+    // into the blade, with nonzero velocity at contact.
+    const t=THREE.MathUtils.clamp((time-raise)/(contact-raise),0,1),remaining=1-Math.pow(t,3.2);
     angle=1.5*remaining;reach=.15*remaining;lift=.24*remaining;
   }else{
     const rebound=Math.min(.09,(duration-contact)*.4);
@@ -115,7 +116,7 @@ export function createWorkshopMotion({ scene, furnacePose, onImpact=()=>{}, onTr
     if(disposed||heating||swing||transfers.size)return false;
     const cadence=Number(payload.durationMs);
     const duration=Number.isFinite(cadence)&&cadence>0?Math.max(.28,Math.min(.56,cadence/1000*.92)):.56;
-    swing={...payload,position:payload.position?.clone()||new THREE.Vector3(),time:0,duration,contact:Math.min(.32,duration*.58),impacted:false};return true;
+    swing={...payload,position:payload.position?.clone()||new THREE.Vector3(),time:0,poseTime:0,duration,contact:Math.min(.32,duration*.58),impacted:false};return true;
   }
   function update(dt) {
     if(disposed||!(dt>0))return;
@@ -129,7 +130,17 @@ export function createWorkshopMotion({ scene, furnacePose, onImpact=()=>{}, onTr
       state.entry.root.userData.localMaterials?.forEach(m=>{if(!m.userData.respondsToHeat)return;m.emissive.copy(m.userData.baseEmission||new THREE.Color(0)).lerp(new THREE.Color('#ff5217'),intensity*THREE.MathUtils.lerp(.92,.85,withdrawal));m.emissiveIntensity=Math.max(m.userData.heatIntensity??0,brightness);});
       if(t>=1)finishHeating(true);
     }
-    if(swing){const state=swing;state.time+=dt;if(!state.impacted&&state.time>=state.contact){state.impacted=true;const corrected=onImpact({...state,position:state.position.clone()});if(swing===state&&corrected?.position)state.position.copy(corrected.position);}if(swing===state&&state.time>=state.duration)swing=null;}
+    if(swing){
+      const state=swing;state.time+=dt;state.poseTime=state.time;
+      if(!state.impacted&&state.time>=state.contact){
+        // A render tick can cross contact. Show that exact pose with the first
+        // sparks; preserve the logical clock and resume recoil next tick.
+        state.impacted=true;state.poseTime=state.contact;
+        const corrected=onImpact({...state,position:state.position.clone()});
+        if(swing===state&&corrected?.position)state.position.copy(corrected.position);
+      }
+      if(swing===state&&state.time>=state.duration)swing=null;
+    }
   }
   function forget(id) { if(heating?.id===id)cancelHeating();transfers.delete(id);placements.delete(id); }
   function reset() { cancelHeating();for(const transfer of transfers.values())attach(transfer.root,transfer.target);transfers.clear();swing=null; }

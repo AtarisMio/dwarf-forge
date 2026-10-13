@@ -143,6 +143,19 @@ test('an impact callback may reset the current run without a stale pending strik
   motion=createWorkshopMotion({scene,onImpact:()=>motion.reset()});
   motion.strike({outcome:'success'});assert.doesNotThrow(()=>motion.update(motion.getStrike().contact));assert.equal(motion.isInteracting(),false);motion.dispose();
 });
+
+test('30fps and 60fps strikes show the actual contact pose once before rebounding, including a paused contact frame',()=>{
+  for(const fps of [30,60])for(const durationMs of [640,640/1.45]){
+    const scene=new THREE.Scene();let impacts=0;
+    const motion=createWorkshopMotion({scene,onImpact:()=>impacts++});motion.strike({outcome:'success',durationMs});
+    while(!impacts)motion.update(1/fps);
+    const strike=motion.getStrike();assert.ok(strike.time>=strike.contact,'logical clock continues through the sampling boundary');
+    assert.equal(strike.poseTime,strike.contact,'the first spark frame shows physical surface contact');
+    motion.update(0);assert.equal(strike.poseTime,strike.contact,'pausing preserves the rendered contact pose');
+    motion.update(1/fps);assert.ok(strike.poseTime>strike.contact,'the next advancing frame resumes the rebound');
+    assert.equal(impacts,1);motion.dispose();
+  }
+});
 test('an impact-time form change corrects the active hammer contact before its pose is rendered',()=>{
   const scene=new THREE.Scene(),newSurface=new THREE.Vector3(-.96,1.75,-.92);let impacts=0;
   const motion=createWorkshopMotion({scene,onImpact:()=>{impacts++;return {position:newSurface};}});

@@ -38,6 +38,15 @@ test('a forceful strike is lifted overhead before its accelerating downstroke',(
   assert.ok(raised>origin.y+.7,'hammer is visibly raised high above the blade');
 });
 
+test('a heavy downstroke concentrates most of its descent in the final quarter',()=>{
+  const {frame,origin}=setup(),raise=.32*.42,fall=.32-raise;
+  const height=frame(raise).face.y-origin.y,remaining=frame(.32-fall*.25).face.y-origin.y;
+  assert.ok(remaining/height>.6,'more than 60% of the vertical descent is driven through the last quarter');
+  const middle=raise+fall*.5,midSpeed=(frame(middle).face.y-frame(middle+.001).face.y)/.001;
+  const endSpeed=(frame(.319).face.y-frame(.32).face.y)/.001;
+  assert.ok(endSpeed>midSpeed*3,'the hammer keeps gaining speed toward impact instead of floating down at a similar pace');
+});
+
 test('a strike accelerates into the blade and rebounds without parking on its surface',()=>{
   const {frame,origin}=setup();
   const earlySpeed=(frame(.15).face.y-frame(.151).face.y)/.001,lateSpeed=(frame(.31).face.y-frame(.311).face.y)/.001;

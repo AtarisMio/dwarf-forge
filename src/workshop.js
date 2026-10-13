@@ -903,7 +903,7 @@ export function createWorkshop(container, callbacks = {}) {
         if (readyContact.localPoint) { anvilSword.updateWorldMatrix(true, false); readyPosition = anvilSword.localToWorld(readyContact.localPoint.clone()); }
       } else if (!swing && !worldState && swordState) readyPosition = findForgeContact(swordGroup, { bladeMaterials: [bladeMaterial, edgeMaterial, fullerMaterial] })?.position;
       const origin = swing?.position || readyPosition || wornFace.getWorldPosition(new THREE.Vector3());
-      const pose = swing ? getHammerStrikePose({ camera, scale: .68, origin, time: swing.time, contact: swing.contact, duration: swing.duration }) : getHammerReadyPose({ camera, scale: .68, origin });
+      const pose = swing ? getHammerStrikePose({ camera, scale: .68, origin, time: swing.poseTime, contact: swing.contact, duration: swing.duration }) : getHammerReadyPose({ camera, scale: .68, origin });
       const entryBlend = forgeMode ? hammerReadyBlend : 1;
       hammer.position.lerp(pose.position, entryBlend); hammer.quaternion.slerp(pose.quaternion, entryBlend);
     }
