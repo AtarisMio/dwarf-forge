@@ -87,12 +87,12 @@ test('desktop and portrait forge cameras keep the entire overhead stroke within 
   }
 });
 
-test('square-window windups keep the head ahead of the near plane without stretching the arm',()=>{
+test('windups keep the aligned head ahead of the near plane without stretching the arm across window shapes',()=>{
   // Blade contacts include the thick citadel and the fish blade's offset plate.
   const origins=[new THREE.Vector3(-.96,1.60112,-.92),new THREE.Vector3(-.96,1.7504,-.92),new THREE.Vector3(-.96,1.670527,-.7664)];
   const depthAxis=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI/2);
-  for(let step=0;step<=22;step++){
-    const aspect=.75+step*.025,{camera}=setup(aspect);
+  for(let step=0;step<=80;step++){
+    const aspect=.4+step*.025,{camera}=setup(aspect);
     const shoulder=new THREE.Vector3(THREE.MathUtils.lerp(.21,.28,THREE.MathUtils.clamp((aspect-.9)/.65,0,1)),-.3,-.12);
     for(const origin of origins)for(const time of [...Array.from({length:57},(_,i)=>i/100),.32*.42]){
       const pose=getHammerStrikePose({camera,scale:.68,origin,time});

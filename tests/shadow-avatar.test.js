@@ -15,6 +15,9 @@ test('full avatar is invisible to color/depth camera passes but casts a complete
 });
 test('avatar follows actual held-tool pose, walking legs animate, and all resources release', () => {
   const avatar=createShadowAvatar(),camera=new THREE.PerspectiveCamera(),hammer=new THREE.Group();camera.position.set(0,1.83,0);camera.add(hammer);hammer.position.set(.4,-.5,-1);
+  const shaft=avatar.root.getObjectByName('tool-shaft'),head=avatar.root.getObjectByName('tool-head');
+  const shaftAxis=new THREE.Vector3(0,1,0).applyQuaternion(shaft.quaternion);
+  assert.ok(head.position.clone().sub(shaft.position).cross(shaftAxis).length()<1e-6,'shadow handle also passes through the head center');
   avatar.update({camera,hammerRoot:hammer,time:.2,walking:true});const leg=avatar.root.getObjectByName('left-leg');const moving=leg.rotation.x;
   avatar.update({camera,hammerRoot:hammer,time:0,walking:false});assert.notEqual(moving,leg.rotation.x);
   const resources=new Set();avatar.root.traverse(mesh=>{if(mesh.isMesh){resources.add(mesh.geometry);resources.add(mesh.material);resources.add(mesh.customDepthMaterial);}});

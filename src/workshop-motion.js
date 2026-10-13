@@ -46,8 +46,8 @@ export function getHammerStrikePose({camera,scale,origin,time,contact=.32,durati
   const raise=contact*.42;
   // The interpolated square-window camera is closer to the raised head.
   // Keep that arc farther forward, fading smoothly back to the wide/phone arc.
-  const square=THREE.MathUtils.smoothstep(camera.aspect,.75,.9)*(1-THREE.MathUtils.smoothstep(camera.aspect,1.05,1.3));
-  const raisedReach=.1-.22*square;
+  const square=THREE.MathUtils.smoothstep(camera.aspect,.65,.85)*(1-THREE.MathUtils.smoothstep(camera.aspect,1.1,1.4));
+  const raisedReach=.05-.25*square;
   // Lift from a low guard and draw the hand inward across the frame. Raising
   // only the head hides the extra travel above the screen and strains the IK.
   if(time<raise){const t=ease(time/raise);angle=.15+1.35*t;reach=THREE.MathUtils.lerp(.13,raisedReach,t);lift=-.045+.26*t;sweep=.06-.18*t;}

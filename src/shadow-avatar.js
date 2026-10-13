@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {HAMMER_HEAD,HAMMER_HANDLE} from './hammer-frame.js';
 
 // Layer masking would also exclude objects from Three's shadow pass (it tests
 // the view camera's layers). A color/depth-silent material with a real custom
@@ -15,8 +16,9 @@ export function createShadowAvatar() {
   const legs=[mesh('left-leg',cylinder,-.13,.47,.055,.095,.78,.11),mesh('right-leg',cylinder,.13,.47,.055,.095,.78,.11)];
   mesh('left-foot',box,-.13,.075,-.04,.19,.14,.31);mesh('right-foot',box,.13,.075,-.04,.19,.14,.31);
   const arms={};for(const [side,x] of [['left',-.27],['right',.27]]){arms[side]={upper:mesh(`${side}-upper-arm`,cylinder,x,1.2,.02,.07,.35,.07),lower:mesh(`${side}-forearm`,cylinder,x,.92,-.04,.065,.36,.065),hand:mesh(`${side}-hand`,sphere,x,.74,-.08,.075,.08,.065)};}
-  const tool=new THREE.Group();root.add(tool);const shaft=new THREE.Mesh(cylinder,material);shaft.name='tool-shaft';shaft.scale.set(.035,.72,.035);shaft.position.y=.02;tool.add(shaft);
-  const head=new THREE.Mesh(box,material);head.name='tool-head';head.position.set(-.058,.405,0);head.scale.set(.29,.14,.15);tool.add(head);
+  const tool=new THREE.Group();root.add(tool);const shaft=new THREE.Mesh(cylinder,material);shaft.name='tool-shaft';shaft.scale.set(.035,HAMMER_HANDLE.length,.035);shaft.rotation.z=HAMMER_HANDLE.roll;
+  shaft.position.set(0,HAMMER_HANDLE.length/2,0).applyEuler(shaft.rotation).add(new THREE.Vector3(...HAMMER_HANDLE.position));tool.add(shaft);
+  const head=new THREE.Mesh(box,material);head.name='tool-head';head.position.fromArray(HAMMER_HEAD.position);head.rotation.z=HAMMER_HEAD.roll;head.scale.set(.29,.14,.15);tool.add(head);
   tool.traverse(m=>{if(m.isMesh){m.castShadow=true;m.customDepthMaterial=depth;}});
   const local=new THREE.Vector3(),handWorld=new THREE.Vector3(),parentInverse=new THREE.Matrix4();
   function segment(part,a,b,radius){part.position.copy(a).add(b).multiplyScalar(.5);const direction=b.clone().sub(a);part.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.clone().normalize());part.scale.set(radius,direction.length(),radius);}

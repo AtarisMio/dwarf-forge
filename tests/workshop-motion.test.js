@@ -55,13 +55,24 @@ test('the actual left hammer face points down at contact and the gripped hand st
   const pose=getHammerStrikePose({camera,scale:.68,origin,time:.32});
   hammer.position.copy(pose.position);hammer.quaternion.copy(pose.quaternion);hammer.scale.copy(pose.scale);hammer.updateWorldMatrix(true,false);
   // Left polished cap from the rendered head assembly, not the head underside.
-  const headRotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-.12);
+  const headRotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),HAMMER_HEAD.roll);
   const cap=new THREE.Vector3(-.285,0,0).multiplyScalar(.58).applyQuaternion(headRotation).add(new THREE.Vector3(-.058,.405,0));
   const face=cap.applyMatrix4(hammer.matrixWorld),normal=new THREE.Vector3(-1,0,0).applyQuaternion(headRotation).transformDirection(hammer.matrixWorld);
   assert.ok(face.distanceTo(origin)<1e-6,'rendered striking cap lands on the sword');
   assert.ok(normal.dot(new THREE.Vector3(0,-1,0))>.999,'strike uses the flat cap, facing the blade');
   const grip=new THREE.Vector3(.055,-.205,.067).applyMatrix4(hammer.matrixWorld);
-  assert.ok(grip.y>origin.y+.18,'hand and handle do not disappear into the anvil');
+  assert.ok(grip.y>origin.y+.13,'the correctly aligned grip stays above the blade');
+  const parts=[{geometry:new RoundedBoxGeometry(.125,.185,.085,3,.034),position:new THREE.Vector3(.055,-.205,.067),roll:-.13},
+    {geometry:new THREE.SphereGeometry(1,20,14),position:new THREE.Vector3(-.019,-.17,.071),roll:-.7,scale:new THREE.Vector3(.034,.074,.029)}];
+  for(let finger=0;finger<4;finger++){
+    const y=-.126-finger*.045,curve=new THREE.CatmullRomCurve3([new THREE.Vector3(.104,y,.056),new THREE.Vector3(.068,y+.007,-.015),new THREE.Vector3(.005,y+.005,-.052),new THREE.Vector3(-.033,y,-.015),new THREE.Vector3(-.024,y,.025)]);
+    parts.push({geometry:new THREE.TubeGeometry(curve,10,.021-finger*.0015,8,false),position:new THREE.Vector3(),roll:0});
+  }
+  for(const part of parts){
+    const matrix=new THREE.Matrix4().compose(part.position,new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),part.roll),part.scale||new THREE.Vector3(1,1,1)).premultiply(hammer.matrixWorld);
+    for(let i=0;i<part.geometry.attributes.position.count;i++)assert.ok(new THREE.Vector3().fromBufferAttribute(part.geometry.attributes.position,i).applyMatrix4(matrix).y>origin.y+.045,'palm, curled fingers and thumb clear the blade at impact');
+    part.geometry.dispose();
+  }
 });
 test('thin and thick swords start and finish at the same forging ready pose without a jump',()=>{
   const camera=forgeCamera(1280/720);

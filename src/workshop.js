@@ -8,7 +8,7 @@ import { createTicketBoard } from './ticket-board.js';
 import { createSwordRenderer } from './sword-renderer.js';
 import { createSwordPhysics } from './sword-physics.js';
 import { findForgeContact } from './forge-contact.js';
-import { HAMMER_HEAD, HAMMER_WRIST } from './hammer-frame.js';
+import { HAMMER_HEAD, HAMMER_HANDLE, HAMMER_COLLAR, HAMMER_LEATHER, HAMMER_WRIST } from './hammer-frame.js';
 import { createRelicShopRenderer } from './relic-shop-renderer.js';
 import { createVectorPanel, svgText } from './vector-panels.js';
 import { WORKSHOP_ART, ledgerArt, calendarArt } from './workshop-vector-art.js';
@@ -521,8 +521,8 @@ export function createWorkshop(container, callbacks = {}) {
 
   // The hammer is camera-local: it reads as a hand-held tool in every view.
   const hammer = new THREE.Group(); camera.add(hammer);
-  const hammerHandle = lathe(hammer, wood, [[.043, 0], [.047, .035], [.04, .22], [.034, .54], [.038, .69], [.044, .78]], 24);
-  hammerHandle.position.set(.035, -.39, 0); hammerHandle.rotation.z = -.12; hammerHandle.scale.z = .78;
+  const hammerHandle = lathe(hammer, wood, [[.043, 0], [.047, .035], [.04, .22], [.034, .54], [.038, .69], [.035, HAMMER_HANDLE.length]], 24);
+  hammerHandle.position.fromArray(HAMMER_HANDLE.position); hammerHandle.rotation.z = HAMMER_HANDLE.roll; hammerHandle.scale.z = .78;
   const headAssembly = new THREE.Group(); headAssembly.position.fromArray(HAMMER_HEAD.position); headAssembly.rotation.z = HAMMER_HEAD.roll; headAssembly.scale.setScalar(HAMMER_HEAD.scale); hammer.add(headAssembly);
   bevelBox(headAssembly, iron, -.01, 0, 0, .36, .235, .245, .044);
   bevelBox(headAssembly, polishedIron, -.22, 0, 0, .13, .22, .232, .032);
@@ -530,13 +530,14 @@ export function createWorkshop(container, callbacks = {}) {
   // A forged cross-peen tapers to a rounded edge on the back of the head.
   const peenShape = new THREE.Shape(); peenShape.moveTo(.205, -.075); peenShape.lineTo(.365, -.024); peenShape.quadraticCurveTo(.39, 0, .365, .024); peenShape.lineTo(.205, .075); peenShape.closePath();
   const peen = new THREE.Mesh(geometry(new THREE.ExtrudeGeometry(peenShape, { depth: .17, bevelEnabled: true, bevelSize: .014, bevelThickness: .015, bevelSegments: 3 })), iron); peen.position.z = -.085; headAssembly.add(peen);
-  bevelBox(headAssembly, darkWood, 0, .125, 0, .078, .014, .065, .007);
+  bevelBox(headAssembly, darkWood, 0, .125, 0, .12, .014, .095, .007);
   bevelBox(headAssembly, polishedIron, -.01, -.115, 0, .125, .025, .21, .014);
-  const neckCollar = cylinder(hammer, iron, .054, .048, .09, -.04, .265, 0, 24); neckCollar.rotation.z = -.12;
-  const hammerGrip = lathe(hammer, leather, [[.048, 0], [.052, .03], [.052, .21], [.044, .3]], 24); hammerGrip.position.set(.018, -.34, 0);
+  const neckCollar = cylinder(hammer, iron, .054, .048, .09, ...HAMMER_COLLAR.position, 24); neckCollar.rotation.z = HAMMER_COLLAR.roll;
+  const hammerGrip = lathe(hammer, leather, [[.048, 0], [.052, .03], [.052, .21], [.044, .3]], 24); hammerGrip.position.fromArray(HAMMER_LEATHER.position); hammerGrip.rotation.z = HAMMER_LEATHER.roll;
   const handleSeam = [];
-  for (let i = 0; i <= 72; i++) { const t = i / 72, a = t * Math.PI * 2 * 7; handleSeam.push(new THREE.Vector3(.018 + Math.cos(a) * .051, -.325 + t * .27, Math.sin(a) * .048)); }
-  hammer.add(new THREE.Mesh(geometry(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(handleSeam), 72, .003, 4, false)), darkWood));
+  for (let i = 0; i <= 72; i++) { const t = i / 72, a = t * Math.PI * 2 * 7; handleSeam.push(new THREE.Vector3(Math.cos(a) * .051, .015 + t * .27, Math.sin(a) * .048)); }
+  const hammerGripSeam = new THREE.Mesh(geometry(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(handleSeam), 72, .003, 4, false)), darkWood);
+  hammerGripSeam.position.fromArray(HAMMER_LEATHER.position); hammerGripSeam.rotation.z = HAMMER_LEATHER.roll; hammer.add(hammerGripSeam);
   // Palm, curled fingers and opposing thumb form a grip, rather than the old
   // single oval. The forearm angles down naturally out of the viewport.
   const glove = material({ color: '#71513c', map: leatherTexture, roughness: .92, bumpMap: leatherTexture, bumpScale: .005 });
