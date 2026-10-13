@@ -10,13 +10,13 @@
 
 ![Dwarf Forge 桌面工坊与主菜单](docs/screenshots/workshop.jpg)
 
-挥锤锻造：以正常长度的手臂从高处举锤，起落沉稳，末段迅速加速，锤头端面击中剑刃后短促回弹；火星出现时显示准确接触帧，进化时落点跟随新的剑形态。桌面与竖屏镜头保持实际伸手距离。[动作参考视频与观测记录](docs/hammer-motion-references.md)。
+挥锤锻造：从低位收锤向内大幅抬臂，举过头顶后在末段迅速加速砸下；锤头端面击中剑刃，短促回弹后沉回待机。手臂保持正常长度，火星出现时显示准确接触帧，进化时落点跟随新的剑形态。[动作参考视频与观测记录](docs/hammer-motion-references.md)。
 
 实际工坊渲染的连续挥锤演示：
 
-![连续挥锤：高举、加速落槌和短促回弹](docs/screenshots/hammer-motion.gif)
+![连续挥锤：低位收锤、大幅抬臂、加速落槌和短促回弹](docs/screenshots/hammer-motion.gif)
 
-![高举落槌后的热剑与短臂握锤姿势](docs/screenshots/hammer-strike.jpg)
+![高举落槌后的热剑与低位收锤姿势](docs/screenshots/hammer-strike.jpg)
 
 手工裁切的羊皮票数看板：不规则皮边、细纤维与斑驳折痕。基础票用空心方格，遗物加票用绿色「＋」，移除票在原方格上打叉；机制加票在对应结果下方单独显示。
 

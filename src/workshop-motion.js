@@ -23,13 +23,13 @@ function hammerContactFrame(camera,origin,scale){
     .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2-HAMMER_HEAD.roll));
   const contactPosition=origin.clone().sub(HAMMER_FACE.clone().multiplyScalar(scale).applyQuaternion(contactQuaternion));
   const contactWrist=contactPosition.clone().add(HAMMER_GRIP.clone().multiplyScalar(scale).applyQuaternion(contactQuaternion));
-  return {toGrip,contactQuaternion,contactWrist,armScale:1};
+  return {toGrip,right,contactQuaternion,contactWrist,armScale:1};
 }
 
-function hammerWorkingPose({camera,scale,origin},angle,reach,lift){
+function hammerWorkingPose({camera,scale,origin},angle,reach,lift,sweep=0){
   const frame=hammerContactFrame(camera,origin,scale),axis=new THREE.Vector3(0,1,0).cross(frame.toGrip);
   const quaternion=new THREE.Quaternion().setFromAxisAngle(axis,angle).multiply(frame.contactQuaternion);
-  const wrist=frame.contactWrist.addScaledVector(frame.toGrip,reach);wrist.y+=lift;
+  const wrist=frame.contactWrist.addScaledVector(frame.toGrip,reach).addScaledVector(frame.right,sweep);wrist.y+=lift;
   const position=wrist.sub(HAMMER_GRIP.clone().multiplyScalar(scale).applyQuaternion(quaternion));
   // Protect the whole head envelope without flattening the stroke into a slide.
   const head=position.clone().add(new THREE.Vector3(...HAMMER_HEAD.position).multiplyScalar(scale).applyQuaternion(quaternion));
@@ -39,23 +39,29 @@ function hammerWorkingPose({camera,scale,origin},angle,reach,lift){
   const result={position:new THREE.Vector3(),quaternion:new THREE.Quaternion(),scale:new THREE.Vector3(),armScale:frame.armScale};matrix.decompose(result.position,result.quaternion,result.scale);return result;
 }
 
-export function getHammerReadyPose(options){return hammerWorkingPose(options,.45,.03,.03);}
+export function getHammerReadyPose(options){return hammerWorkingPose(options,.15,.13,-.045,.06);}
 
 export function getHammerStrikePose({camera,scale,origin,time,contact=.32,duration=.56}){
-  const options={camera,scale,origin};let angle,reach,lift;
+  const options={camera,scale,origin};let angle,reach,lift,sweep;
   const raise=contact*.42;
-  if(time<raise){const t=ease(time/raise);angle=.45+1.05*t;reach=.03+.12*t;lift=.03+.21*t;}
+  // The interpolated square-window camera is closer to the raised head.
+  // Keep that arc farther forward, fading smoothly back to the wide/phone arc.
+  const square=THREE.MathUtils.smoothstep(camera.aspect,.75,.9)*(1-THREE.MathUtils.smoothstep(camera.aspect,1.05,1.3));
+  const raisedReach=.1-.22*square;
+  // Lift from a low guard and draw the hand inward across the frame. Raising
+  // only the head hides the extra travel above the screen and strains the IK.
+  if(time<raise){const t=ease(time/raise);angle=.15+1.35*t;reach=THREE.MathUtils.lerp(.13,raisedReach,t);lift=-.045+.26*t;sweep=.06-.18*t;}
   else if(time<contact){
     // Load the descent toward the end: a heavy start followed by a fast drive
     // into the blade, with nonzero velocity at contact.
     const t=THREE.MathUtils.clamp((time-raise)/(contact-raise),0,1),remaining=1-Math.pow(t,3.2);
-    angle=1.5*remaining;reach=.15*remaining;lift=.24*remaining;
+    angle=1.5*remaining;reach=raisedReach*remaining;lift=.215*remaining;sweep=-.12*remaining;
   }else{
     const rebound=Math.min(.09,(duration-contact)*.4);
-    if(time<contact+rebound){const t=THREE.MathUtils.clamp((time-contact)/rebound,0,1),up=1-(1-t)*(1-t);angle=.55*up;reach=.04*up;lift=.04*up;}
-    else {const t=ease((time-contact-rebound)/(duration-contact-rebound));angle=.55-.1*t;reach=.04-.01*t;lift=.04-.01*t;}
+    if(time<contact+rebound){const t=THREE.MathUtils.clamp((time-contact)/rebound,0,1),up=1-(1-t)*(1-t);angle=.44*up;reach=.085*up;lift=.025*up;sweep=.035*up;}
+    else {const t=ease((time-contact-rebound)/(duration-contact-rebound));angle=.44-.29*t;reach=.085+.045*t;lift=.025-.07*t;sweep=.035+.025*t;}
   }
-  return hammerWorkingPose(options,angle,reach,lift);
+  return hammerWorkingPose(options,angle,reach,lift,sweep);
 }
 
 export function getHammerForearmPose(wristPosition,aspect){
