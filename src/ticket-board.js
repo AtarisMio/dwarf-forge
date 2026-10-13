@@ -1,30 +1,31 @@
 import * as THREE from 'three';
 import {createVectorPanel, svgText} from './vector-panels.js';
+import {ticketSquares, ticketEffectLabel} from './ticket-glyphs.js';
 
 const CATEGORIES = [
   {id:'break',label:'碎裂',base:9}, {id:'damage',label:'损伤',base:2},
   {id:'hold',label:'保持',base:5}, {id:'success',label:'成功',base:12},
   {id:'great',label:'大成功',base:2}
 ];
-const ink='#d8d0b5', brass='#cbb578', green='#92b59b', red='#cd927b';
+const ink='#d8d0b5', brass='#cbb578', green='#92b59b';
 const safeNumber=value=>Number.isFinite(value)&&value>=0?value:0;
 function boardArt(snapshot){
   const active=!!snapshot?.active;
   let body='<rect width="1600" height="765" fill="#151d19"/><rect x="14" y="14" width="1572" height="737" rx="3" fill="none" stroke="#83764e" stroke-width="3"/>';
   body+=svgText('DRAW TICKETS',800,47,{size:26,color:brass,weight:500})+svgText('抽签票数',800,93,{size:48,color:ink});
   body+=svgText(active?snapshot.swordName??'当前铁砧剑':'铁砧未放剑',800,143,{size:29,color:'#b0b4a1',weight:400});
-  for(const [text,x] of [['结果',180],['基准',590],['增加',855],['移除',1120],['当前',1390]])body+=svgText(text,x,201,{size:29,color:brass});
+  for(const [text,x] of [['结果',180],['基准',450],['遗物加票',660],['机制加票',875],['移除',1090],['当前',1390]])body+=svgText(text,x,201,{size:29,color:brass});
   CATEGORIES.forEach((category,index)=>{
     const row=active?snapshot.rows?.find(r=>r.id===category.id):null,y=257+index*70;
-    const base=row?safeNumber(row.base):category.base,added=row?safeNumber(row.added):0,removed=row?safeNumber(row.removed):0,total=row?safeNumber(row.total):base;
+    const base=row?safeNumber(row.base):category.base,relicAdded=row?safeNumber(row.relicAdded??row.added):0,mechanicAdded=row?safeNumber(row.mechanicAdded):0,removed=row?safeNumber(row.removed):0,total=row?safeNumber(row.total):base;
     body+=`<path d="M60 ${y+35}H1540" stroke="#4b5140" stroke-width="1"/>`;
-    body+=svgText(category.label,180,y,{size:40,color:ink})+svgText(base,590,y,{size:39,color:'#c6c3ac',weight:400});
-    body+=svgText(added?`+${added}`:'—',855,y,{size:40,color:added?green:'#5d685a'});
-    body+=svgText(removed?`−${removed}`:'—',1120,y,{size:40,color:removed?red:'#5d685a'});
-    body+=svgText(total,1390,y,{size:42,color:brass});
+    body+=svgText(category.label,180,y,{size:40,color:ink});
+    for(const [field,value,center,width,mode] of [['base',base,450,170,'base'],['relicAdded',relicAdded,660,188,'added'],['mechanicAdded',mechanicAdded,875,188,'mechanic'],['removed',removed,1090,188,'removed'],['total',total,1390,232,'total']]){
+      body+=ticketSquares(value,{id:`${category.id}-${field}`,x:center-width/2,y:y-28,width,height:56,mode});
+    }
   });
-  body+=svgText('原始票数 · 等级加权与最终概率请看铁砧',800,621,{size:26,color:'#aaae99',weight:400});
-  const notes=active?(snapshot.temporary??[]).map(effect=>effect.label).join(' · '):'将剑放到铁砧，查看该剑的加票、移票与下一锤效果';
+  body+=svgText('一格一票 · 蓝色为机制加票 · 划销表示移除',800,621,{size:26,color:'#aaae99',weight:400});
+  const notes=active?(snapshot.temporary??[]).map(effect=>ticketEffectLabel(effect.label)).join(' · '):'将剑放到铁砧，查看该剑的加票、移票与下一锤效果';
   // SVG wrapping is explicit to preserve Chinese spacing across browser fonts.
   const lines=Array.from(notes.matchAll(/.{1,53}/gu),match=>match[0]);
   lines.slice(0,4).forEach((line,index)=>{body+=svgText(line,800,660+index*26,{size:24,color:index===0?green:'#b0b4a1',weight:400});});

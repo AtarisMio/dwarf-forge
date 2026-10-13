@@ -1,4 +1,5 @@
 import './style.css';
+import {ticketReadout,ticketEffectLabel,ticketMechanisms} from './ticket-glyphs.js';
 import './mobile.css';
 import {ForgeGame, RELICS, ITEMS, SWORD_TYPES, money} from './simulation.js';
 import {createWorkshop} from './workshop.js';
@@ -249,7 +250,9 @@ function renderStation() {
   } else if(station === 'tickets') {
     const ticketOpen=p.querySelector('.ticket-details')?.open ?? false;
     const ticketData=game.ticketDisplay(anvil()??null);
-    p.innerHTML = heading + '<p class="station-kicker">DRAW TICKETS</p>' + (isTouchUI()?`<details class="ticket-details" ${ticketOpen?'open':''}><summary>查看大字票数</summary><table class="ticket-readout"><thead><tr><th>结果</th><th>基准</th><th>增加</th><th>移除</th><th>当前</th></tr></thead><tbody>${ticketData.rows.map(row=>`<tr><th>${esc(row.label)}</th><td>${row.base}</td><td class="added">${row.added?'+'+row.added:'—'}</td><td class="removed">${row.removed?'−'+row.removed:'—'}</td><td>${row.total}</td></tr>`).join('')}</tbody></table><p class="note">${ticketData.active?ticketData.temporary.map(effect=>esc(effect.label)).join('；')||'以铁砧上的剑为准。':'铁砧未放剑，显示基础票。'}</p></details>`:'<p>看板列出五种结果的基础票、增加票和移除票。临时效果以铁砧上的剑为准。</p>') + '<p class="note">最终概率请看铁砧上的看板。</p><button class="wide" data-action="leave">返回工坊</button>';
+    const mechanismsOpen=p.querySelector('.ticket-mechanisms')?.open??false;
+    p.innerHTML = heading + '<p class="station-kicker">DRAW TICKETS</p>' + (isTouchUI()?`<details class="ticket-details" ${ticketOpen?'open':''}><summary>查看票数方格</summary>${ticketReadout(ticketData)}<p class="note">${ticketData.active?ticketData.temporary.map(effect=>esc(ticketEffectLabel(effect.label))).join('；')||'以铁砧上的剑为准。':'铁砧未放剑，显示基础票。'}</p></details>`:'<p>一格一票。浅色为基础票，绿色为遗物加票，蓝色为机制加票，红色划销为移除票，金色为当前票。</p>') + ticketMechanisms(ticketData.sources) + '<p class="note">最终概率请看铁砧上的看板。</p><button class="wide" data-action="leave">返回工坊</button>';
+    if(mechanismsOpen)p.querySelector('.ticket-mechanisms').open=true;
   }
 }
 async function heatBlade() {

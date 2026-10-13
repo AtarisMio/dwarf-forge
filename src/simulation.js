@@ -56,16 +56,23 @@ export class ForgeGame {
  remove(id){const w=this.state.swords.find(w=>w.id===id);this.state.swords=this.state.swords.filter(w=>w.id!==id);if(this.state.carriedId===id)this.state.carriedId=null;if(this.state.anvilId===id)this.state.anvilId=null;if(this.state.frenzySwordId===id)this.endFrenzy();if(!this.current){this.state.selected=this.state.swords.find(w=>w.location!=='tribute')?.id??this.state.swords[0]?.id??null;this.applyInheritance(this.current);}if(w?.location==='tribute')this.refreshOffered();}
  rawTicketData(w){
   const base={...BASE_TICKETS},t={...base},added=Object.fromEntries(Object.keys(base).map(k=>[k,0])),removed={...added};
-  const add=(key,n)=>{t[key]+=n;added[key]+=n;},remove=(key,n)=>{t[key]-=n;removed[key]+=n;};
+  const relicAdded={...added},relicRemoved={...added},mechanicAdded={...added},mechanicRemoved={...added},sources=[];
+  const labels={blind:'盲骰','run-tickets':'本局永久票','sword-success':'该剑成长与继承票','sword-great':'该剑累积大成功票'};
+  const record=(outcome,n,id,kind,direction)=>{
+   if(!n)return;
+   const counts=kind==='relic'?(direction==='added'?relicAdded:relicRemoved):(direction==='added'?mechanicAdded:mechanicRemoved);counts[outcome]+=n;
+   sources.push({id,label:labels[id]??RELICS.find(r=>r.id===id)?.name??ITEMS.find(item=>item.id===id)?.name??id,kind,outcome,added:direction==='added'?n:0,removed:direction==='removed'?n:0});
+  };
+  const add=(key,n,id,kind='relic')=>{t[key]+=n;added[key]+=n;record(key,n,id,kind,'added');},remove=(key,n,id,kind='relic')=>{t[key]-=n;removed[key]+=n;record(key,n,id,kind,'removed');};
   const protectedHit=!!w&&(w.id===this.state.frenzySwordId&&this.state.frenzyUntil>this.state.clock||w.charge>=10);
-  if(this.has('sickle'))for(const key of Object.keys(t)){const difference=5-t[key];if(difference>=0)add(key,difference);else remove(key,-difference);}
-  for(const key of Object.keys(t))add(key,this.state.runTickets[key]??0);
-  add('success',(this.has('bent')?4:0)+(this.has('spike')?6:0)+(w?.successTickets??0)+(this.has('third-eye')&&w?.previous==='hold'?4:0));
-  add('great',(this.has('coal')?1:0)+(this.has('nail')?2:0)+(this.has('oracle')?4:0)+(protectedHit&&this.has('mana')?6:0)+(w?.blind??0)+(w?.greatTickets??0)+this.state.grudgeTickets);
-  add('hold',(this.has('seed')?6:0)+(this.has('weight')?3:0)+(this.has('stone')?2:0));add('damage',this.has('pearl')?3:0);add('break',this.has('butterfingers')?3:0);remove('break',this.has('hoop')?2:0);add('great',this.has('butterfingers')?5:0);
-  if(this.has('thorn')){const n=Math.min(2,t.hold);remove('hold',n);add('damage',n);}if(this.has('obsidian')&&(w?.level??0)>=8){const n=Math.min(2,t.success);remove('success',n);add('great',n);}
-  if(this.has('mallet')){const n=Math.min(1,t.damage);remove('damage',n);add('success',n);}if(this.has('whetstone')){const n=Math.min(2,t.hold);remove('hold',n);add('success',n);}if(w?.chalk)add('great',t.great);
-  return {base,t,added,removed,protectedHit};
+  if(this.has('sickle'))for(const key of Object.keys(t)){const difference=5-t[key];if(difference>=0)add(key,difference,'sickle');else remove(key,-difference,'sickle');}
+  for(const key of Object.keys(t))add(key,this.state.runTickets[key]??0,'run-tickets','mechanic');
+  add('success',this.has('bent')?4:0,'bent');add('success',this.has('spike')?6:0,'spike');add('success',w?.successTickets??0,'sword-success','mechanic');add('success',this.has('third-eye')&&w?.previous==='hold'?4:0,'third-eye','mechanic');
+  add('great',this.has('coal')?1:0,'coal');add('great',this.has('nail')?2:0,'nail');add('great',this.has('oracle')?4:0,'oracle');add('great',protectedHit&&this.has('mana')?6:0,'mana','mechanic');add('great',w?.blind??0,'blind','mechanic');add('great',w?.greatTickets??0,'sword-great','mechanic');add('great',this.state.grudgeTickets,'grudge','mechanic');
+  add('hold',this.has('seed')?6:0,'seed');add('hold',this.has('weight')?3:0,'weight');add('hold',this.has('stone')?2:0,'stone');add('damage',this.has('pearl')?3:0,'pearl');add('break',this.has('butterfingers')?3:0,'butterfingers');remove('break',this.has('hoop')?2:0,'hoop');add('great',this.has('butterfingers')?5:0,'butterfingers');
+  if(this.has('thorn')){const n=Math.min(2,t.hold);remove('hold',n,'thorn');add('damage',n,'thorn');}if(this.has('obsidian')&&(w?.level??0)>=8){const n=Math.min(2,t.success);remove('success',n,'obsidian','mechanic');add('great',n,'obsidian','mechanic');}
+  if(this.has('mallet')){const n=Math.min(1,t.damage);remove('damage',n,'mallet');add('success',n,'mallet');}if(this.has('whetstone')){const n=Math.min(2,t.hold);remove('hold',n,'whetstone');add('success',n,'whetstone');}if(w?.chalk)add('great',t.great,'chalk','mechanic');
+  return {base,t,added,removed,relicAdded,relicRemoved,mechanicAdded,mechanicRemoved,sources,protectedHit};
  }
  ticketDisplay(sword=this.current){
   const active=!!sword&&sword.location==='anvil'&&sword.id===this.state.anvilId;
@@ -82,7 +89,7 @@ export class ForgeGame {
    if(sword.scale)temporary.push({id:'scale',label:'龙鳞：下一锤碎裂结果转保持'});
    if(sword.ward&&this.has('mark'))temporary.push({id:'mark',label:'闪电印记：下一锤碎裂概率 ×0.6'});
   }
-  return {active,swordId:active?sword.id:null,swordName:active?sword.name:null,rows:Object.keys(BASE_TICKETS).map(id=>({id,label:labels[id],base:data.base[id],added:data.added[id]??0,removed:data.removed[id]??0,total:data.t[id]})),temporary};
+  return {active,swordId:active?sword.id:null,swordName:active?sword.name:null,rows:Object.keys(BASE_TICKETS).map(id=>({id,label:labels[id],base:data.base[id],added:data.added[id]??0,removed:data.removed[id]??0,total:data.t[id],relicAdded:data.relicAdded?.[id]??0,relicRemoved:data.relicRemoved?.[id]??0,mechanicAdded:data.mechanicAdded?.[id]??0,mechanicRemoved:data.mechanicRemoved?.[id]??0})),sources:data.sources??[],temporary};
  }
  odds(){
   const w=this.current,level=w?.level??0,{t,protectedHit}=this.rawTicketData(w);
