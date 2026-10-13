@@ -8,7 +8,7 @@
 
 引导期间暂停物理、游戏计时、移动和设施交互，只让镜头平滑移动。按钮可用 Tab 操作；E／右箭头继续，左箭头上一句，Enter／空格激活焦点按钮，Esc 跳过。切换窗口不额外弹出暂停菜单。
 
-实现：`src/intro-dialogue.js` 管理内容和页码；`src/main.js` 接入新合约、输入与计时；`src/workshop.js` 提供暂停时的导览镜头；`index.html` 和 `src/style.css` 提供清晰字幕。
+实现：`src/intro-dialogue.ts` 管理内容和页码；`src/main.ts` 接入新合约、输入与计时；`src/workshop.ts` 提供暂停时的导览镜头；`index.html` 和 `src/style.css` 提供清晰字幕。
 
 验证：导航、跳过、重启、空存档／读档分支的单元测试；浏览器核对开场、镜头、键盘与按钮、完成和跳过进入赠礼、加载进度不重播。发布到现有 Cloudflare Worker 后检查 HTTPS 和静态资源，并保存界面截图。
 

@@ -3,9 +3,9 @@
 文字铭牌、剑币标记、账板、日历、龙眼与材质细节使用 SVG 源稿。
 刷新按钮箭头使用 Three.js ShapeGeometry。
 
-`src/workshop-vector-art.js` 生成可编辑的路径和文本；
-运行 `node scripts/export-vector-art.mjs` 可导出独立 SVG 到 `public/art/vector/`。
-铭牌由 `src/relic-shop-renderer.js` 按实时商品数据生成，字体保持正常比例。
+`src/workshop-vector-art.ts` 生成可编辑的路径和文本；
+运行 `npm run export:art` 可导出独立 SVG 到 `public/art/vector/`。
+铭牌由 `src/relic-shop-renderer.ts` 按实时商品数据生成，字体保持正常比例。
 日历从炉后移到锻造账板右侧的空墙，避免炉体遮挡；账板等比调整以留出位置。
 
 WebGL 最终采样 SVG 的高清光栅结果。主材质最长边 1024，木纹 2048；

@@ -31,7 +31,7 @@ The same walkthrough says merchant starts day 3 then repeats every three days. T
 
 ## Centralized community parameters
 
-All balance definitions reside in `src/rules.js`; `simulation.js` owns transitions, physical locations, shops and restoration.
+All balance definitions reside in `src/rules.ts`; `simulation.ts` owns transitions, physical locations, shops and restoration.
 
 - [Tribute table](https://www.forgetax.tools/tribute): all 21 quota values and repeated rounded ×1.2 endless growth. Official confirmation covers day 21 and unchanged first three, not every intermediate value.
 - [Forging odds](https://www.forgetax.tools/guides/forging-odds): raw 9/2/5/12/2 tickets, break curve, multiplicative mitigation and 1000-ticket normalization. +5 29.7%/+10 46.7% are also in the playing guide. The published +0 table says 572/95/238/95 while its described largest-remainder algorithm yields a one-ticket difference; this implementation uses the stated algorithm and does not claim exact per-ticket identity.

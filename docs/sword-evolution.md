@@ -6,7 +6,7 @@ The parent lane cross-checked [北城花猫’s original gameplay, P1](https://w
 
 ## Shared pure API
 
-`src/sword-evolution.js` exports:
+`src/sword-evolution.ts` exports:
 
 - `getSwordForm(sword)` → `{key, family, stage, level, name, route}`. Stage is 0–10; level is its even threshold from 0–20; key is `${family}/${stage}`. The function does not mutate state or draw randomness.
 - `SWORD_ROUTES`: frozen array of `{id, families}`. Heavy maps to citadel/holy, serrated to sawblade/dragonfang, arcane to runeblade/splitblade.

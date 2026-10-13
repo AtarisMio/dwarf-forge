@@ -44,9 +44,12 @@ npm run dev
 打开终端显示的本地地址。检查与生产构建：
 
 ```sh
+npm run typecheck
 npm test
 npm run build
 ```
+
+源码、测试与工具脚本均使用 TypeScript。`npm run typecheck` 对三者执行严格检查，同时检查变量与参数的类型推断，并禁止显式 `any`、类型错误屏蔽与经 `unknown` 中转的双重断言；`npm run build` 会先完成该检查。外部存档以 `unknown` 输入，通过运行时校验后转换为游戏状态。
 
 构建输出为 `dist/`。GitHub Actions 在 Node.js 22 上执行安装、测试与构建，不自动部署。
 
@@ -68,13 +71,14 @@ npm run build
 
 | 模块 | 职责 |
 | --- | --- |
-| `src/simulation.js`、`src/rules.js` | 交易、锻造、合约、物品和存档验证 |
-| `src/main.js`、`src/save-slots.js` | DOM 界面、游戏调度、三个本地存档与共享图鉴 |
-| `src/workshop.js`、`src/sword-renderer.js` | Three.js 工坊与程序化剑模型 |
-| `src/sword-physics.js`、`src/workshop-motion.js` | 延迟加载的 Rapier 地面物理与交互动画 |
-| `src/ticket-board.js`、`src/vector-panels.js` | SVG 生成的清晰场景看板 |
-| `src/audio.js`、`src/dragon-voice.js` | 浏览器合成声音与巨龙低吼 |
-| `tests/` | Node.js 原生测试，无需浏览器即可运行 |
+| `src/simulation.ts`、`src/rules.ts` | 交易、锻造、合约、物品和存档验证 |
+| `src/main.ts`、`src/save-slots.ts` | DOM 界面、游戏调度、三个本地存档与共享图鉴 |
+| `src/workshop.ts`、`src/sword-renderer.ts` | Three.js 工坊与程序化剑模型 |
+| `src/sword-physics.ts`、`src/workshop-motion.ts` | 延迟加载的 Rapier 地面物理与交互动画 |
+| `src/ticket-board.ts`、`src/vector-panels.ts` | SVG 生成的清晰场景看板 |
+| `src/audio.ts`、`src/dragon-voice.ts` | 浏览器合成声音与巨龙低吼 |
+| `src/game-types.ts`、`src/workshop-types.ts` | 游戏领域类型、3D 场景接口与回调契约 |
+| `tests/` | 经严格类型检查的 TypeScript 测试，使用 tsx + Node.js 原生测试运行器 |
 
 物理模块无法加载时，地面剑保留静态拾取能力。存储不可用时仍可在当前页面游玩。存档按域名隔离；更换域名不会自动转移旧进度。
 
