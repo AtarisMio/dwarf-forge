@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { createWorkshopMotion, getHammerStrikePose, getHammerForearmPose, getTicketFocusView, getHeldSwordPose } from '../src/workshop-motion.js';
+import { createWorkshopMotion, getHammerReadyPose, getHammerStrikePose, getHammerForearmPose, getTicketFocusView, getHeldSwordPose } from '../src/workshop-motion.js';
 import {HAMMER_HEAD,HAMMER_FACE,HAMMER_WRIST} from '../src/hammer-frame.js';
 const pose = (parent, x, y=0, z=0) => ({ parent, position:new THREE.Vector3(x,y,z), quaternion:new THREE.Quaternion(), scale:new THREE.Vector3(1,1,1) });
 
@@ -58,12 +58,11 @@ test('the actual left hammer face points down at contact and the gripped hand st
   const grip=new THREE.Vector3(.055,-.205,.067).applyMatrix4(hammer.matrixWorld);
   assert.ok(grip.y>origin.y+.18,'hand and handle do not disappear into the anvil');
 });
-test('a thick sword does not cause the camera-held hammer to jump at the start or end of a swing',()=>{
+test('thin and thick swords start and finish at the same forging ready pose without a jump',()=>{
   const camera=new THREE.PerspectiveCamera();camera.position.set(-1.05,2.22,.95);camera.lookAt(-1.05,1.51,-2.1);
-  const restPosition=new THREE.Vector3(.43,-.43,-.99),restQuaternion=new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,-.3,-.44));
-  for(const time of [0,.48]){
-    const pose=getHammerStrikePose({camera,restPosition,restQuaternion,scale:.68,origin:new THREE.Vector3(-.96,1.75,-.92),time});
-    assert.ok(pose.position.distanceTo(restPosition)<1e-7,'rest pose outside the anvil retains its position');assert.ok(pose.quaternion.angleTo(restQuaternion)<1e-7);
+  for(const y of [1.61,1.75])for(const time of [0,.48]){
+    const options={camera,scale:.68,origin:new THREE.Vector3(-.96,y,-.92)},ready=getHammerReadyPose(options),pose=getHammerStrikePose({...options,time});
+    assert.ok(pose.position.distanceTo(ready.position)<1e-7,'swing starts and finishes at the current blade working pose');assert.ok(pose.quaternion.angleTo(ready.quaternion)<1e-7);
   }
 });
 test('rounded hammer head and gripping hand stay clear of the anvil throughout desktop and portrait swings',()=>{
@@ -74,7 +73,7 @@ test('rounded hammer head and gripping hand stay clear of the anvil throughout d
     {g:new RoundedBoxGeometry(.125,.185,.085,3,.034),p:new THREE.Vector3(.055,-.205,.067),roll:-.13}
   ];
   const point=new THREE.Vector3();
-  for(const [z,toolX] of [[.95,.43],[3.3,.2]])for(const y of [1.61,1.75]){
+  for(const [z,toolX] of [[.95,.43],[3.3,.2],[4.18,.2]])for(const y of [1.61,1.75]){
     const camera=new THREE.PerspectiveCamera();camera.position.set(-1.05,2.22,z);camera.lookAt(-1.05,1.51,-2.1);camera.updateMatrixWorld();
     for(let frame=0;frame<=48;frame++){
       const t=frame/100,pose=getHammerStrikePose({camera,restPosition:new THREE.Vector3(toolX,-.43,-.99),restQuaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,-.3,-.44)),scale:.68,origin:new THREE.Vector3(-.96,y,-.92),time:t});
@@ -94,20 +93,24 @@ test('rounded hammer head and gripping hand stay clear of the anvil throughout d
   }
   parts.forEach(part=>part.g.dispose());
 });
-test('independent forearm connects to the animated wrist and clears the anvil while its elbow stays offscreen',()=>{
-  const sleeve=new THREE.CylinderGeometry(.082,.104,1,20),point=new THREE.Vector3();
-  for(const [aspect,toolX,z] of [[1280/720,.43,.95],[360/800,.2,3.3]]){
+test('articulated forearm and upper arm connect at the elbow and clear the anvil while the shoulder stays offscreen',()=>{
+  const sleeve=new THREE.CylinderGeometry(.104,.13,1,20),point=new THREE.Vector3();
+  for(const [aspect,toolX,z] of [[1280/720,.43,.95],[360/800,.2,4.18]]){
     const camera=new THREE.PerspectiveCamera(66,aspect,.045,60);camera.position.set(-1.05,2.22,z);camera.lookAt(-1.05,1.51,-2.1);camera.updateMatrixWorld();
     for(let frame=0;frame<=48;frame++){
       const pose=getHammerStrikePose({camera,restPosition:new THREE.Vector3(toolX,-.43,-.99),restQuaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,-.3,-.44)),scale:.68,origin:new THREE.Vector3(-.96,1.75,-.92),time:frame/100});
-      const wrist=HAMMER_WRIST.clone().applyMatrix4(new THREE.Matrix4().compose(pose.position,pose.quaternion,pose.scale)),arm=getHammerForearmPose(wrist,aspect);
-      const middle=arm.wrist.clone().add(arm.elbow).multiplyScalar(.5),matrix=new THREE.Matrix4().compose(middle,arm.quaternion,new THREE.Vector3(.68,arm.length,.68));
-      assert.ok(new THREE.Vector3(0,.5,0).applyMatrix4(matrix).distanceTo(wrist)<1e-6,'upper endpoint follows actual hand');
-      const elbow=arm.elbow.clone().applyMatrix4(camera.matrixWorld).project(camera);assert.ok(elbow.y< -1,'sleeve end is below viewport');
-      matrix.premultiply(camera.matrixWorld);
-      for(let i=0;i<sleeve.attributes.position.count;i++){
-        point.fromBufferAttribute(sleeve.attributes.position,i).applyMatrix4(matrix);
-        if(point.x> -1.575&&point.x<-.355&&point.z> -1.1875&&point.z<-.6525)assert.ok(point.y>=1.508,'forearm stays above anvil where their volumes overlap');
+      const wrist=HAMMER_WRIST.clone().applyMatrix4(new THREE.Matrix4().compose(pose.position,pose.quaternion,pose.scale)),arm=getHammerForearmPose(wrist,aspect,pose.armScale);
+      assert.ok(Math.abs(arm.wrist.distanceTo(arm.elbow)-arm.length)<1e-6,'forearm maintains its physical length');
+      assert.ok(Math.abs(arm.shoulder.distanceTo(arm.elbow)-arm.upperLength)<1e-6,'upper arm maintains its physical length');
+      const shoulder=arm.shoulder.clone().applyMatrix4(camera.matrixWorld).project(camera);assert.ok(shoulder.y< -1,'upper sleeve continues below viewport');
+      for(const [start,end,quaternion,length] of [[arm.wrist,arm.elbow,arm.quaternion,arm.length],[arm.elbow,arm.shoulder,arm.upperQuaternion,arm.upperLength]]){
+        const radiusScale=Math.min(1.12,pose.armScale),middle=start.clone().add(end).multiplyScalar(.5),matrix=new THREE.Matrix4().compose(middle,quaternion,new THREE.Vector3(.68*radiusScale,length,.68*radiusScale));
+        assert.ok(new THREE.Vector3(0,.5,0).applyMatrix4(matrix).distanceTo(start)<1e-6,'upper endpoint follows its joint');
+        matrix.premultiply(camera.matrixWorld);
+        for(let i=0;i<sleeve.attributes.position.count;i++){
+          point.fromBufferAttribute(sleeve.attributes.position,i).applyMatrix4(matrix);
+          if(point.x> -1.575&&point.x<-.355&&point.z> -1.1875&&point.z<-.6525)assert.ok(point.y>=1.508,'arm stays above anvil where their volumes overlap');
+        }
       }
     }
   }

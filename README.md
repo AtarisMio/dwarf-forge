@@ -10,7 +10,11 @@
 
 ![Dwarf Forge 桌面工坊与主菜单](docs/screenshots/workshop.jpg)
 
-挥锤锻造：锤头端面落在剑刃上，手腕和前臂随动作抬起、接触与回收；进化时落点跟随新的剑形态。
+挥锤锻造：锤头端面落在剑刃上，手腕与肘部配合抬锤、加速落下和短促回弹；两段手臂保持固定长度，进化时落点跟随新的剑形态。[动作参考视频与观测记录](docs/hammer-motion-references.md)。
+
+实际工坊渲染的连续挥锤演示：
+
+![连续挥锤：稳定工作姿势、加速敲击和短促回弹](docs/screenshots/hammer-motion.gif)
 
 ![锤头击中热剑，前臂从手腕延伸至画面右下方](docs/screenshots/hammer-strike.jpg)
 

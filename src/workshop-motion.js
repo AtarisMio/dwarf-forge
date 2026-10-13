@@ -15,36 +15,63 @@ function blend(root, from, to, progress, arc=0) {
   root.quaternion.slerpQuaternions(from.quaternion,to.quaternion,t);root.scale.lerpVectors(from.scale,to.scale,t);
 }
 
-export function getHammerStrikePose({ camera, restPosition, restQuaternion, scale, origin, time, contact=.22, duration=.48 }) {
-  const rest=worldPose({parent:camera,position:restPosition,quaternion:restQuaternion,scale:new THREE.Vector3().setScalar(scale)});
+function hammerContactFrame(camera,origin,scale){
   const toPlayer=camera.getWorldPosition(new THREE.Vector3()).sub(origin);toPlayer.y=0;toPlayer.normalize();
   const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));right.y=0;right.normalize();
   const toGrip=toPlayer.clone().addScaledVector(right,.85).normalize();
   const yaw=Math.atan2(-toGrip.z,toGrip.x),contactQuaternion=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),yaw)
     .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2-HAMMER_HEAD.roll));
   const contactPosition=origin.clone().sub(HAMMER_FACE.clone().multiplyScalar(scale).applyQuaternion(contactQuaternion));
-  const gripOffset=q=>HAMMER_GRIP.clone().multiplyScalar(scale).applyQuaternion(q);
-  const restWrist=rest.position.clone().add(gripOffset(rest.quaternion)),contactWrist=contactPosition.clone().add(gripOffset(contactQuaternion));
-  const raisedWrist=restWrist.clone().addScaledVector(toPlayer,.045);raisedWrist.y=Math.max(restWrist.y+.14,contactWrist.y+.1);
-  const raisedQuaternion=new THREE.Quaternion().setFromAxisAngle(right,1.05).multiply(contactQuaternion);
-  let wrist,quaternion,clearance=0;
-  if(time<.1){const t=ease(time/.1);wrist=restWrist.clone().lerp(raisedWrist,t);quaternion=rest.quaternion.clone().slerp(raisedQuaternion,t);}
-  else if(time<contact){const t=ease((time-.1)/(contact-.1));wrist=raisedWrist.clone().lerp(contactWrist,t);quaternion=raisedQuaternion.clone().slerp(contactQuaternion,t);clearance=.025*(1-t);}
-  else if(time<contact+.04){wrist=contactWrist;quaternion=contactQuaternion;}
-  else {const t=ease((time-contact-.04)/(duration-contact-.04));wrist=contactWrist.clone().lerp(restWrist,t);wrist.y+=Math.sin(Math.PI*t)*.22;quaternion=contactQuaternion.clone().slerp(rest.quaternion,t);clearance=Math.sin(Math.PI*t)*.08;}
-  const position=wrist.sub(gripOffset(quaternion));
-  // Lift the complete head envelope, not just a nominal contact point.
-  const head=position.clone().add(new THREE.Vector3(...HAMMER_HEAD.position).multiplyScalar(scale).applyQuaternion(quaternion));
-  const nearBlade=ease((.55-Math.hypot(head.x-origin.x,head.z-origin.z))/.2);
-  position.y+=nearBlade*Math.max(0,origin.y+clearance-position.y-hammerHeadMinimumY(quaternion,scale));
-  camera.updateWorldMatrix(true,false);const matrix=new THREE.Matrix4().compose(position,quaternion,new THREE.Vector3().setScalar(scale)).premultiply(camera.matrixWorld.clone().invert());
-  const result={position:new THREE.Vector3(),quaternion:new THREE.Quaternion(),scale:new THREE.Vector3()};matrix.decompose(result.position,result.quaternion,result.scale);return result;
+  const contactWrist=contactPosition.clone().add(HAMMER_GRIP.clone().multiplyScalar(scale).applyQuaternion(contactQuaternion));
+  const armScale=Math.max(.75,Math.hypot(camera.position.x-origin.x,camera.position.z-origin.z)/1.87);
+  return {toGrip,contactQuaternion,contactWrist,armScale};
 }
 
-export function getHammerForearmPose(wristPosition,aspect){
-  const x=THREE.MathUtils.lerp(.4,.62,THREE.MathUtils.clamp((aspect-.9)/.65,0,1)),elbow=new THREE.Vector3(x,-.93,-.48);
-  const axis=wristPosition.clone().sub(elbow),length=axis.length();
-  return {wrist:wristPosition.clone(),elbow,length,quaternion:new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),axis.normalize())};
+function hammerWorkingPose({camera,scale,origin},angle,reach,lift){
+  const frame=hammerContactFrame(camera,origin,scale),axis=new THREE.Vector3(0,1,0).cross(frame.toGrip);
+  const quaternion=new THREE.Quaternion().setFromAxisAngle(axis,angle).multiply(frame.contactQuaternion);
+  const wrist=frame.contactWrist.addScaledVector(frame.toGrip,reach);wrist.y+=lift;
+  const position=wrist.sub(HAMMER_GRIP.clone().multiplyScalar(scale).applyQuaternion(quaternion));
+  // Protect the whole head envelope without flattening the stroke into a slide.
+  const head=position.clone().add(new THREE.Vector3(...HAMMER_HEAD.position).multiplyScalar(scale).applyQuaternion(quaternion));
+  const nearBlade=ease((.55-Math.hypot(head.x-origin.x,head.z-origin.z))/.2);
+  position.y+=nearBlade*Math.max(0,origin.y-position.y-hammerHeadMinimumY(quaternion,scale));
+  camera.updateWorldMatrix(true,false);const matrix=new THREE.Matrix4().compose(position,quaternion,new THREE.Vector3().setScalar(scale)).premultiply(camera.matrixWorld.clone().invert());
+  const result={position:new THREE.Vector3(),quaternion:new THREE.Quaternion(),scale:new THREE.Vector3(),armScale:frame.armScale};matrix.decompose(result.position,result.quaternion,result.scale);return result;
+}
+
+export function getHammerReadyPose(options){return hammerWorkingPose(options,.3,.025,.025);}
+
+export function getHammerStrikePose({camera,scale,origin,time,contact=.22,duration=.48}){
+  const options={camera,scale,origin};let angle,reach,lift;
+  const raise=contact*.38;
+  if(time<raise){const t=ease(time/raise);angle=.3+.6*t;reach=.025+.02*t;lift=.025+.035*t;}
+  else if(time<contact){
+    // Acceleration into contact, rather than a smoothstep that stops before impact.
+    const t=THREE.MathUtils.clamp((time-raise)/(contact-raise),0,1),remaining=1-t*t;
+    angle=.9*remaining;reach=.045*remaining;lift=.06*remaining;
+  }else{
+    const rebound=Math.min(.09,(duration-contact)*.4);
+    if(time<contact+rebound){const t=THREE.MathUtils.clamp((time-contact)/rebound,0,1),up=1-(1-t)*(1-t);angle=.38*up;reach=.03*up;lift=.03*up;}
+    else {const t=ease((time-contact-rebound)/(duration-contact-rebound));angle=.38-.08*t;reach=.03-.005*t;lift=.03-.005*t;}
+  }
+  return hammerWorkingPose(options,angle,reach,lift);
+}
+
+export function getHammerForearmPose(wristPosition,aspect,armScale=1){
+  // Perspective pullback changes view-model calibration, never a bone's length
+  // during a stroke. The elbow bends; the sleeve does not telescope.
+  const x=THREE.MathUtils.lerp(.4,.7,THREE.MathUtils.clamp((aspect-.9)/.65,0,1));
+  const shoulder=new THREE.Vector3(x,-1.05,-.46).multiplyScalar(armScale),length=.72*armScale,upperLength=.82*armScale;
+  const delta=wristPosition.clone().sub(shoulder),distance=delta.length(),axis=delta.clone().normalize();
+  const reach=THREE.MathUtils.clamp(distance,Math.abs(upperLength-length)+1e-5,upperLength+length-1e-5);
+  if(distance!==reach)shoulder.addScaledVector(axis,distance-reach);
+  const along=(upperLength*upperLength-length*length+reach*reach)/(2*reach),height=Math.sqrt(Math.max(0,upperLength*upperLength-along*along));
+  const pole=new THREE.Vector3(1,-.08,.3);pole.addScaledVector(axis,-pole.dot(axis)).normalize();
+  const elbow=shoulder.clone().addScaledVector(axis,along).addScaledVector(pole,height);
+  const forearmAxis=wristPosition.clone().sub(elbow).normalize(),upperAxis=elbow.clone().sub(shoulder).normalize(),up=new THREE.Vector3(0,1,0);
+  return {wrist:wristPosition.clone(),elbow,shoulder,length,upperLength,
+    quaternion:new THREE.Quaternion().setFromUnitVectors(up,forearmAxis),upperQuaternion:new THREE.Quaternion().setFromUnitVectors(up,upperAxis)};
 }
 
 export function getTicketFocusView(aspect, fov=66, sidePanel=false) {

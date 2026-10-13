@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createMouseLook } from './mouse-look.js';
 import { createTouchMovement } from './touch-movement.js';
-import { createWorkshopMotion, getHammerStrikePose, getHammerForearmPose, getTicketFocusView, getHeldSwordPose } from './workshop-motion.js';
+import { createWorkshopMotion, getHammerReadyPose, getHammerStrikePose, getHammerForearmPose, getTicketFocusView, getHeldSwordPose } from './workshop-motion.js';
 import { createShadowAvatar } from './shadow-avatar.js';
 import { createTicketBoard } from './ticket-board.js';
 import { createSwordRenderer } from './sword-renderer.js';
@@ -553,7 +553,11 @@ export function createWorkshop(container, callbacks = {}) {
   const sleeve = material({ color: '#353b38', map: woodTexture, roughness: 1 });
   const cuff = cylinder(forearmGroup, sleeve, .082 * .68, .104 * .68, 1, 0, 0, 0, 20);
   const wristBand = cylinder(forearmGroup, leather, .086 * .68, .087 * .68, 1, 0, 0, 0, 20);
+  const upperArmGroup = new THREE.Group(); camera.add(upperArmGroup);
+  const upperSleeve = cylinder(upperArmGroup, sleeve, .104 * .68, .13 * .68, 1, 0, 0, 0, 20);
+  const elbowJoint = sphere(upperArmGroup, sleeve, 0, 0, 0, .104 * .68); elbowJoint.castShadow = true; elbowJoint.receiveShadow = true;
   const wristPosition = new THREE.Vector3();
+  let hammerReadyBlend = 0, readyContact = null;
   hammer.position.set(.56, -.47, -.82); hammer.rotation.set(.1, -.3, -.44); hammer.scale.setScalar(.68);
   const toolFill = new THREE.PointLight('#dcc6a3', 1.5, 2.3, 1.8); toolFill.position.set(-.15, .2, -.15); camera.add(toolFill);
 
@@ -877,20 +881,46 @@ export function createWorkshop(container, callbacks = {}) {
     const toolX = THREE.MathUtils.lerp(.2, .43, THREE.MathUtils.clamp((camera.aspect - .9) / .65, 0, 1));
     hammer.position.set(toolX, -.43, -.99); hammer.rotation.set(.1, -.3, -.44);
     const swing = motion.getStrike();
-    if (swing && swing.outcome !== 'break' && swing.time >= swing.contact && swing.time < swing.contact + .04) {
+    if (swing && swing.outcome !== 'break' && swing.time >= swing.contact && swing.time <= swing.contact + .025) {
       const anvilSword = physicalSwords.get(worldState?.anvilId)?.mesh;
       const surface = findForgeContact(anvilSword || (!worldState && swordState ? swordGroup : null), { bladeMaterials: anvilSword ? null : [bladeMaterial, edgeMaterial, fullerMaterial] });
       if (surface) swing.position.copy(surface.position);
     }
-    if (swing) { const pose = getHammerStrikePose({ camera, restPosition: hammer.position, restQuaternion: hammer.quaternion, scale: .68, origin: swing.position, time: swing.time, contact: swing.contact, duration: swing.duration }); hammer.position.copy(pose.position); hammer.quaternion.copy(pose.quaternion); }
-    forearmGroup.visible = hammer.visible;
+    const forgeMode = focused === 'anvil';
+    hammerReadyBlend = forgeMode ? Math.min(1, hammerReadyBlend + dt / .18) : 0;
+    if (!forgeMode) readyContact = null;
+    let armScale = 1;
+    if (swing || forgeMode) {
+      const anvilSword = physicalSwords.get(worldState?.anvilId)?.mesh;
+      let readyPosition;
+      if (!swing && anvilSword) {
+        // Static solid geometry changes only when its visual is replaced. Cache
+        // the local surface during ready frames; every strike still raycasts fresh.
+        if (readyContact?.root !== anvilSword || readyContact.visual !== anvilSword.userData.visual) {
+          const surface = findForgeContact(anvilSword);
+          readyContact = { root: anvilSword, visual: anvilSword.userData.visual, localPoint: surface?.localPoint };
+        }
+        if (readyContact.localPoint) { anvilSword.updateWorldMatrix(true, false); readyPosition = anvilSword.localToWorld(readyContact.localPoint.clone()); }
+      } else if (!swing && !worldState && swordState) readyPosition = findForgeContact(swordGroup, { bladeMaterials: [bladeMaterial, edgeMaterial, fullerMaterial] })?.position;
+      const origin = swing?.position || readyPosition || wornFace.getWorldPosition(new THREE.Vector3());
+      const pose = swing ? getHammerStrikePose({ camera, scale: .68, origin, time: swing.time, contact: swing.contact, duration: swing.duration }) : getHammerReadyPose({ camera, scale: .68, origin });
+      const entryBlend = forgeMode ? hammerReadyBlend : 1;
+      hammer.position.lerp(pose.position, entryBlend); hammer.quaternion.slerp(pose.quaternion, entryBlend);
+      armScale = pose.armScale ?? 1;
+      if (swing) { swing.armScale ??= armScale; armScale = swing.armScale; }
+    }
+    forearmGroup.visible = upperArmGroup.visible = hammer.visible;
     if (forearmGroup.visible) {
       hammer.updateWorldMatrix(true, true); wristMarker.getWorldPosition(wristPosition); camera.worldToLocal(wristPosition);
-      const forearm = getHammerForearmPose(wristPosition, camera.aspect), gloveLength = Math.min(.11, forearm.length), sleeveLength = Math.max(.001, forearm.length - gloveLength);
+      const forearm = getHammerForearmPose(wristPosition, camera.aspect, armScale), gloveLength = Math.min(.11, forearm.length), sleeveLength = Math.max(.001, forearm.length - gloveLength);
+      const radiusScale = Math.min(1.12, armScale);
       forearmGroup.position.copy(forearm.wrist); forearmGroup.quaternion.copy(forearm.quaternion);
-      wrist.position.y = -gloveLength / 2; wrist.scale.y = gloveLength;
-      cuff.position.y = -gloveLength - sleeveLength / 2; cuff.scale.y = sleeveLength;
-      wristBand.position.y = -gloveLength; wristBand.scale.y = .042 * .68;
+      wrist.position.y = -gloveLength / 2; wrist.scale.set(radiusScale, gloveLength, radiusScale);
+      cuff.position.y = -gloveLength - sleeveLength / 2; cuff.scale.set(radiusScale, sleeveLength, radiusScale);
+      wristBand.position.y = -gloveLength; wristBand.scale.set(radiusScale, .042 * .68, radiusScale);
+      upperArmGroup.position.copy(forearm.elbow); upperArmGroup.quaternion.copy(forearm.upperQuaternion);
+      upperSleeve.position.y = -forearm.upperLength / 2; upperSleeve.scale.set(radiusScale, forearm.upperLength, radiusScale);
+      elbowJoint.scale.setScalar(.104 * .68 * radiusScale);
     }
     avatar.update({ camera, heldRoot: physicalSwords.get(worldState?.carriedId)?.mesh, hammerRoot: hammer, time: elapsed, walking });
     bodyLight.position.set(THREE.MathUtils.clamp(camera.position.x + (camera.position.x > 0 ? 1.7 : -1.7), -5.5, 5.5), 3.7, THREE.MathUtils.clamp(camera.position.z + (camera.position.z > .5 ? 1.7 : -1.7), -3.45, 4.99)); bodyLight.target.position.set(camera.position.x, .65, camera.position.z);
@@ -932,6 +962,7 @@ export function createWorkshop(container, callbacks = {}) {
   frame = requestAnimationFrame(animate);
   function dispose() {
     if (disposed) return; disposed = true; cancelAnimationFrame(frame); lookInput.dispose(); touchInput.dispose(); observer.disconnect(); listeners.forEach(remove => remove());
+    readyContact = null;
     motion.dispose(); avatar.dispose(); ticketBoard.dispose(); bodyLight.shadow.map?.dispose(); key.shadow.map?.dispose();
     swordPhysics.dispose(); physicalSwords.forEach(entry => swordRenderer.disposeInstance(entry.mesh)); clearMerchantGoods(); swordRenderer.dispose(); relicShop.dispose();
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(disposeTexture); renderer.dispose(); canvas.remove(); contextNotice.remove();
