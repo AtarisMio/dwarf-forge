@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import {createVectorPanel, svgText} from './vector-panels.js';
 import {ticketRows, ticketRowGlyphs} from './ticket-glyphs.js';
+import {parchmentSurface, hideContour} from './parchment.js';
 
 const ink='#59462c';
+const hideSurface=parchmentSurface(1600,800,'ticket-wall-hide');
 function boardArt(snapshot){
   const rows=ticketRows(snapshot),total=rows.reduce((sum,row)=>sum+row.total,0);
-  let body='<defs><linearGradient id="paper-wash" x2="1" y2="1"><stop stop-color="#ead8ae"/><stop offset=".53" stop-color="#e3cea0"/><stop offset="1" stop-color="#dac293"/></linearGradient></defs>';
-  body+='<rect width="1600" height="800" fill="url(#paper-wash)"/><path d="M28 23Q650 7 1570 24M30 777Q780 790 1573 775" fill="none" stroke="#8b7044" stroke-opacity=".15" stroke-width="4"/>';
+  let body=hideSurface;
   body+=svgText('抽签票',68,49,{size:34,color:ink,anchor:'start',weight:400});
   body+=svgText(snapshot?.active?snapshot.swordName??'铁砧上的剑':'铁砧未放剑',1518,49,{size:25,color:'#826c49',anchor:'end',weight:400});
   rows.forEach((row,index)=>{
@@ -21,7 +22,7 @@ function boardArt(snapshot){
   });
   body+='<path d="M68 652Q800 657 1518 653" fill="none" stroke="#7a6442" stroke-width="2"/>';
   body+=svgText(`共 ${total} 张`,68,693,{size:33,color:ink,anchor:'start',weight:400});
-  body+=svgText('强化风险体现在铁砧牌上',68,748,{size:25,color:'#8b7451',anchor:'start',weight:400});
+  body+=svgText('强化风险体现在铁砧牌上',68,748,{size:25,color:'#71573a',anchor:'start',weight:400});
   return body;
 }
 
@@ -29,13 +30,17 @@ function boardArt(snapshot){
 export function createTicketBoard({anisotropy=1}={}){
   const root=new THREE.Group();root.name='draw-ticket-board';
   const geometries=new Set(),materials=new Set();let disposed=false;
-  const paper=new THREE.MeshStandardMaterial({color:0xc3a977,roughness:1}),nail=new THREE.MeshStandardMaterial({color:0x514837,metalness:.7,roughness:.7});materials.add(paper);materials.add(nail);
-  function box(width,height,depth,x,y,z,material){const geometry=new THREE.BoxGeometry(width,height,depth);geometries.add(geometry);const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);root.add(mesh);return mesh;}
-  box(3.8,1.9,.012,0,0,0,paper);
+  const paper=new THREE.MeshStandardMaterial({color:0xa78350,roughness:1}),nail=new THREE.MeshStandardMaterial({color:0x514837,metalness:.7,roughness:.7});materials.add(paper);materials.add(nail);
+  const outline=hideContour(),shape=new THREE.Shape(),world=([x,y])=>[(x-.5)*3.8,(.5-y)*1.9];
+  shape.moveTo(...world(outline[0]));
+  for(const point of outline.slice(1))shape.lineTo(...world(point));
+  shape.closePath();
+  const backingGeometry=new THREE.ExtrudeGeometry(shape,{depth:.012,bevelEnabled:false,curveSegments:3});geometries.add(backingGeometry);
+  const backing=new THREE.Mesh(backingGeometry,paper);backing.name='ticket-hide-backing';backing.position.z=-.006;root.add(backing);
   const nailGeometry=new THREE.SphereGeometry(.018,6,4);geometries.add(nailGeometry);
   for(const x of [-1.73,1.73]){const mesh=new THREE.Mesh(nailGeometry,nail);mesh.position.set(x,.83,.026);mesh.scale.z=.4;root.add(mesh);}
   const panel=createVectorPanel({width:1600,height:800,resolution:3072,anisotropy});
-  const material=new THREE.MeshBasicMaterial({map:panel.texture,toneMapped:false});materials.add(material);
+  const material=new THREE.MeshBasicMaterial({map:panel.texture,toneMapped:false,transparent:true,alphaTest:.15});materials.add(material);
   const geometry=new THREE.PlaneGeometry(3.8,1.9);geometries.add(geometry);
   const face=new THREE.Mesh(geometry,material);face.name='ticket-board-face';face.position.z=.007;root.add(face);
   function update(snapshot){return disposed?Promise.resolve(false):panel.update(boardArt(snapshot));}

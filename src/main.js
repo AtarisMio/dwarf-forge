@@ -1,5 +1,6 @@
 import './style.css';
 import {ticketReadout,ticketMechanisms} from './ticket-glyphs.js';
+import {parchmentBackground} from './parchment.js';
 import './mobile.css';
 import {ForgeGame, RELICS, ITEMS, SWORD_TYPES, money} from './simulation.js';
 import {createWorkshop} from './workshop.js';
@@ -256,6 +257,7 @@ function renderStation() {
 }
 function showTicketSheet(sources=false) {
   const data=game.ticketDisplay(anvil()??null);
+  $('modal').style.setProperty('--ticket-hide-background',parchmentBackground);
   showModal('ticket-sheet',modalHeader('','抽签票')+ticketReadout(data)+(data.sources.some(source=>source.kind==='mechanic')?ticketMechanisms(data.sources):''));
   if(sources){const details=$('modal').querySelector('.ticket-mechanisms');if(details)details.open=true;}
 }
